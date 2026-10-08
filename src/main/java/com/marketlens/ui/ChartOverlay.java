@@ -43,6 +43,8 @@ public class ChartOverlay extends Overlay
 	private static final double PRICE_PADDING = 0.08;
 	private static final int MIN_PX_PER_PRICE_TICK = 32;
 	private static final int MIN_PX_PER_TIME_TICK = 64;
+	private static final int MIN_PX_PER_DOT = 5;
+	private static final int DOT_SIZE = 3;
 
 	private static final Stroke LINE = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
 	private static final Stroke DASHED = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
@@ -296,32 +298,53 @@ public class ChartOverlay extends Overlay
 			return volume == null ? 0 : (int) (volume * volumePane.height / maxVolume);
 		}
 
-		/** Polyline through the bucket averages; a bucket without trades breaks the line. */
+		/**
+		 * Polyline through the bucket averages. Buckets without trades are skipped, so the line connects
+		 * the surrounding prices; it also reaches back/forward past the view edges so it never starts mid-plot.
+		 * Points get a dot once they are far enough apart to tell apart.
+		 */
 		private void drawLine(Function<TimeseriesPoint, Double> price, Color color)
 		{
+			int from = first;
+			while (from > 0 && price.apply(points.get(from)) == null)
+			{
+				from--;
+			}
+			int to = last;
+			while (to < points.size() - 1 && price.apply(points.get(to)) == null)
+			{
+				to++;
+			}
+
+			boolean dots = plot.width * bucket / (end - start) >= MIN_PX_PER_DOT;
 			Path2D path = new Path2D.Double();
-			boolean drawing = false;
-			for (int i = first; i <= last; i++)
+			boolean started = false;
+			g.setColor(color);
+			for (int i = from; i <= to; i++)
 			{
 				TimeseriesPoint p = points.get(i);
 				Double value = price.apply(p);
 				if (value == null)
 				{
-					drawing = false;
 					continue;
 				}
-				if (drawing)
+				int px = x(p.getTimestamp());
+				int py = y(value);
+				if (started)
 				{
-					path.lineTo(x(p.getTimestamp()), y(value));
+					path.lineTo(px, py);
 				}
 				else
 				{
-					path.moveTo(x(p.getTimestamp()), y(value));
-					drawing = true;
+					path.moveTo(px, py);
+					started = true;
+				}
+				if (dots)
+				{
+					g.fillOval(px - DOT_SIZE / 2, py - DOT_SIZE / 2, DOT_SIZE, DOT_SIZE);
 				}
 			}
 			g.setStroke(LINE);
-			g.setColor(color);
 			g.draw(path);
 		}
 
