@@ -17,6 +17,8 @@ import lombok.Setter;
 public class ChartState
 {
 	private static final int MIN_VISIBLE_BUCKETS = 6;
+	/** Empty buckets after the newest point, so its dot isn't drawn against the price axis (like TradingView's right offset). */
+	private static final int RIGHT_OFFSET_BUCKETS = 2;
 
 	@Getter
 	private final ChartViewport viewport = new ChartViewport();
@@ -86,7 +88,7 @@ public class ChartState
 		long step = bucketSeconds(points);
 		bucketSeconds = step;
 		long first = points.get(0).getTimestamp();
-		long last = points.get(points.size() - 1).getTimestamp();
+		long last = points.get(points.size() - 1).getTimestamp() + step * RIGHT_OFFSET_BUCKETS;
 		if (appliedPoints == null)
 		{
 			viewport.setData(first, last, step * MIN_VISIBLE_BUCKETS, timeframe.getInitialWindowSeconds());
