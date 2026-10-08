@@ -43,7 +43,7 @@ public class ChartRenderer
 	private static final int MIN_PX_PER_TIME_TICK = 64;
 	private static final int MIN_PX_PER_DOT = 5;
 	/** Below this spacing, neighbouring buckets are merged so the lines stay readable (see {@link Downsample}). */
-	private static final int MIN_PX_PER_POINT = 3;
+	private static final int MIN_PX_PER_POINT = 2;
 	private static final int DOT_SIZE = 3;
 
 	private static final Stroke LINE = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
