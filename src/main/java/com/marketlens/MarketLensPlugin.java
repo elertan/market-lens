@@ -4,7 +4,8 @@ import com.google.inject.Provides;
 import com.marketlens.ge.GeButtonInjector;
 import com.marketlens.price.PriceService;
 import com.marketlens.ui.ChartInput;
-import com.marketlens.ui.ChartOverlay;
+import com.marketlens.ui.ExpandedChartOverlay;
+import com.marketlens.ui.GeChartOverlay;
 import com.marketlens.ui.MarketLensSprite;
 import com.marketlens.ui.PriceWindow;
 import javax.inject.Inject;
@@ -51,7 +52,9 @@ public class MarketLensPlugin extends Plugin
 	@Inject
 	private PriceWindow window;
 	@Inject
-	private ChartOverlay chartOverlay;
+	private GeChartOverlay chartOverlay;
+	@Inject
+	private ExpandedChartOverlay expandedChartOverlay;
 	@Inject
 	private ChartInput chartInput;
 	@Inject
@@ -66,6 +69,7 @@ public class MarketLensPlugin extends Plugin
 		buttonInjector.setOnItemShown(itemId -> priceService.getSeries(itemId, config.defaultTimeframe()));
 		priceService.setOnUpdate(() -> clientThread.invokeLater(window::refresh));
 		overlayManager.add(chartOverlay);
+		overlayManager.add(expandedChartOverlay);
 		mouseManager.registerMouseListener(chartInput);
 		mouseManager.registerMouseWheelListener(chartInput);
 		keyManager.registerKeyListener(window);
@@ -77,6 +81,7 @@ public class MarketLensPlugin extends Plugin
 		keyManager.unregisterKeyListener(window);
 		mouseManager.unregisterMouseWheelListener(chartInput);
 		mouseManager.unregisterMouseListener(chartInput);
+		overlayManager.remove(expandedChartOverlay);
 		overlayManager.remove(chartOverlay);
 		priceService.setOnUpdate(() -> {});
 		priceService.clear();

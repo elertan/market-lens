@@ -1,5 +1,7 @@
 package com.marketlens.ui;
 
+import java.util.ArrayList;
+import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.FontID;
@@ -26,6 +28,12 @@ public class GeWidgets
 
 	/** The small GE buttons (+1, +10, -5%...) are one 35x35 sprite. */
 	public static final int SMALL_BUTTON_SIZE = 35;
+
+	/** Close button (X) position in the GE frame, measured from the right and top edges. */
+	private static final int CLOSE_BUTTON_RIGHT = 29;
+	private static final int CLOSE_BUTTON_TOP = 6;
+	private static final int CLOSE_BUTTON_WIDTH = 26;
+	private static final int CLOSE_BUTTON_HEIGHT = 23;
 
 	private static final int BACK_ARROW_WIDTH = 30;
 	private static final int BACK_ARROW_HEIGHT = 23;
@@ -72,20 +80,42 @@ public class GeWidgets
 	}
 
 	/**
-	 * An icon-only small GE button, like the guide-price button: the 35x35 GE button sprite
-	 * with {@code icon} centred on it. Hovering shows the GE's hover sprite and the menu shows "action name".
+	 * An icon-only small GE button, like the guide-price button: the GE button sprite with {@code icon} centred
+	 * on it. Hovering shows the GE's hover sprite and the menu shows "action name". At most 35x35; a smaller button
+	 * shows the four corners of the sprite through clipping layers, so its bevelled edges stay intact.
 	 */
-	public Widget iconButton(Widget parent, MarketLensSprite icon, String name, String action, int x, int y, Runnable onClick)
+	public Widget iconButton(Widget parent, MarketLensSprite icon, String name, String action,
+		int x, int y, int w, int h, Runnable onClick)
 	{
-		Widget button = widgets.layer(parent, x, y, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
-		Widget background = widgets.sprite(button, SpriteID.GeIcons.BUTTON, 0, 0, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
-		widgets.sprite(button, icon.getSpriteId(), (SMALL_BUTTON_SIZE - icon.getWidth()) / 2,
-			(SMALL_BUTTON_SIZE - icon.getHeight()) / 2, icon.getWidth(), icon.getHeight());
+		Widget button = widgets.layer(parent, x, y, w, h);
+		List<Widget> background = new ArrayList<>(4);
+		int leftWidth = w / 2;
+		int topHeight = h / 2;
+		// Each quarter shows the sprite aligned to that corner of the button.
+		int right = w - SMALL_BUTTON_SIZE;
+		int bottom = h - SMALL_BUTTON_SIZE;
+		background.add(buttonCorner(button, 0, 0, leftWidth, topHeight, 0, 0));
+		background.add(buttonCorner(button, leftWidth, 0, w - leftWidth, topHeight, right, 0));
+		background.add(buttonCorner(button, 0, topHeight, leftWidth, h - topHeight, 0, bottom));
+		background.add(buttonCorner(button, leftWidth, topHeight, w - leftWidth, h - topHeight, right, bottom));
+		widgets.sprite(button, icon.getSpriteId(), (w - icon.getWidth()) / 2, (h - icon.getHeight()) / 2,
+			icon.getWidth(), icon.getHeight());
 
 		makeClickable(button, name, action, onClick);
-		button.setOnMouseOverListener((JavaScriptCallback) e -> background.setSpriteId(SpriteID.GeIcons.BUTTON_HOVERED));
-		button.setOnMouseLeaveListener((JavaScriptCallback) e -> background.setSpriteId(SpriteID.GeIcons.BUTTON));
+		button.setOnMouseOverListener((JavaScriptCallback) e -> setSprite(background, SpriteID.GeIcons.BUTTON_HOVERED));
+		button.setOnMouseLeaveListener((JavaScriptCallback) e -> setSprite(background, SpriteID.GeIcons.BUTTON));
 		return button;
+	}
+
+	/** The GE's close button (X), at the GE's position in the top-right of a frame of width {@code frameWidth}. */
+	public Widget closeButton(Widget parent, int frameWidth, Runnable onClick)
+	{
+		Widget close = widgets.sprite(parent, SpriteID.CloseButtons.BUTTON,
+			frameWidth - CLOSE_BUTTON_RIGHT, CLOSE_BUTTON_TOP, CLOSE_BUTTON_WIDTH, CLOSE_BUTTON_HEIGHT);
+		makeClickable(close, null, "Close", onClick);
+		close.setOnMouseOverListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.HOVERED));
+		close.setOnMouseLeaveListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.BUTTON));
+		return close;
 	}
 
 	/** The GE's bottom-left back arrow, placed where the GE places it inside a frame of height {@code frameHeight}. */
@@ -97,6 +127,24 @@ public class GeWidgets
 		arrow.setOnMouseOverListener((JavaScriptCallback) e -> arrow.setOpacity(BACK_ARROW_HOVER_OPACITY));
 		arrow.setOnMouseLeaveListener((JavaScriptCallback) e -> arrow.setOpacity(0));
 		return arrow;
+	}
+
+	/**
+	 * A clipping layer covering x,y,w,h of the button, showing the GE button sprite placed with its
+	 * top-left at spriteX,spriteY (button coordinates).
+	 */
+	private Widget buttonCorner(Widget button, int x, int y, int w, int h, int spriteX, int spriteY)
+	{
+		Widget clip = widgets.layer(button, x, y, w, h);
+		return widgets.sprite(clip, SpriteID.GeIcons.BUTTON, spriteX - x, spriteY - y, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
+	}
+
+	private static void setSprite(List<Widget> sprites, int spriteId)
+	{
+		for (Widget sprite : sprites)
+		{
+			sprite.setSpriteId(spriteId);
+		}
 	}
 
 	private static void makeClickable(Widget widget, String name, String action, Runnable onClick)

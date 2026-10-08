@@ -9,8 +9,9 @@ When you set up a buy or sell offer, a **Market Lens** button (the price-chart i
 - Buy limit and 1-hour trade volume
 - A price chart with high/low lines, volume bars, a crosshair and live price tags
 - Timeframes: 1H, 6H, 24H, 1W, 1M, 6M, 1Y
+- An expand button that opens the chart over most of the game screen
 
-Chart controls: scroll to zoom (hold Shift or Ctrl to zoom around the cursor), drag to pan, double-click to reset. Press Esc or the back arrow to close the window.
+Chart controls: scroll to zoom (hold Shift or Ctrl to zoom around the cursor), drag to pan, double-click to reset. Press Esc or the back arrow to close the window; in the expanded chart, Esc or the close button returns to the normal view.
 
 Price data comes from the [OSRS Wiki real-time prices API](https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices).
 
@@ -26,4 +27,4 @@ Price data comes from the [OSRS Wiki real-time prices API](https://oldschool.run
 | `price` | Wiki API client, cache/refresh policy, GE tax |
 | `chart` | Pure chart maths: viewport (zoom/pan), axis ticks, formatting |
 | `ge` | Adds the Market Lens button to the GE offer setup screen |
-| `ui` | Widget window, chart overlay, mouse input, shared chart state |
+| `ui` | Normal and expanded windows, chart renderer and overlays, mouse input, shared chart state |

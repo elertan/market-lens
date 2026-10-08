@@ -7,20 +7,14 @@ import com.marketlens.price.ItemMapping;
 import com.marketlens.price.LatestPrice;
 import com.marketlens.price.PriceService;
 import com.marketlens.price.Timeframe;
-import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.awt.event.KeyEvent;
-import java.util.EnumMap;
-import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
 import net.runelite.api.FontID;
-import net.runelite.api.FontTypeFace;
 import net.runelite.api.Point;
 import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.gameval.SpriteID;
-import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetTextAlignment;
 import net.runelite.client.callback.ClientThread;
@@ -28,9 +22,9 @@ import net.runelite.client.input.KeyListener;
 
 /**
  * The Market Lens window, built from native game widgets on top of the GE interface:
- * GE frame, title, back arrow, price summary and timeframe buttons.
- * The chart itself is drawn by {@link ChartOverlay} inside {@link #getChartBounds()}.
- * Client thread only, except {@link #keyPressed}.
+ * GE frame, title bar, back arrow, price summary, timeframe tabs and an expand button.
+ * The chart itself is drawn by {@link GeChartOverlay} inside {@link #getChartBounds()}; the expand button
+ * opens it in the {@link ExpandedChartWindow}. Client thread only, except {@link #keyPressed}.
  */
 @Singleton
 public class PriceWindow implements KeyListener
@@ -38,16 +32,11 @@ public class PriceWindow implements KeyListener
 	/** Content starts below the frame's title divider. */
 	private static final int CONTENT_TOP = 40;
 	private static final int CHART_TOP = CONTENT_TOP + 20;
-	/** Vertical centre of the title text in the frame's title bar. */
-	private static final int TITLE_CENTER_Y = 18;
-	private static final int ICON_GAP = 4;
-	/** Left inset of the icon and muted "Market Lens" text in the title bar, where the GE shows its History button. */
-	private static final int BRAND_LEFT = 12;
+	private static final int TABS_TO_CHART = 4;
 	private static final int PAD = 10;
 	private static final int SUMMARY_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
-	private static final int TAB_WIDTH = 34;
-	private static final int TAB_GAP = 2;
+	private static final int EXPAND_BUTTON_WIDTH = 24;
 
 	private final Client client;
 	private final ClientThread clientThread;
@@ -56,11 +45,12 @@ public class PriceWindow implements KeyListener
 	private final WidgetFactory widgets;
 	private final GeWidgets geWidgets;
 	private final SmallItemSprite smallItemSprite;
+	private final ExpandedChartWindow expandedWindow;
 
 	private Widget root;
 	private Widget chartArea;
-	private Widget title;
-	private Widget itemIcon;
+	private TitleBar titleBar;
+	private TimeframeTabs tabs;
 	private Widget buyValue;
 	private Widget buyAge;
 	private Widget sellValue;
@@ -70,11 +60,10 @@ public class PriceWindow implements KeyListener
 	private Widget profitValue;
 	private Widget limitValue;
 	private Widget volumeValue;
-	private final Map<Timeframe, Widget> tabLabels = new EnumMap<>(Timeframe.class);
 
 	@Inject
 	PriceWindow(Client client, ClientThread clientThread, PriceService prices, ChartState state, WidgetFactory widgets,
-		GeWidgets geWidgets, SmallItemSprite smallItemSprite)
+		GeWidgets geWidgets, SmallItemSprite smallItemSprite, ExpandedChartWindow expandedWindow)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
@@ -83,6 +72,7 @@ public class PriceWindow implements KeyListener
 		this.widgets = widgets;
 		this.geWidgets = geWidgets;
 		this.smallItemSprite = smallItemSprite;
+		this.expandedWindow = expandedWindow;
 	}
 
 	public void open(int itemId, Timeframe timeframe)
@@ -94,6 +84,7 @@ public class PriceWindow implements KeyListener
 
 	public void close()
 	{
+		expandedWindow.close();
 		state.close();
 		if (isAttached())
 		{
@@ -113,12 +104,16 @@ public class PriceWindow implements KeyListener
 			build();
 			refresh();
 		}
+		if (expandedWindow.ensureAttached())
+		{
+			refresh();
+		}
 	}
 
-	/** Canvas bounds of the chart area, or null when the window is not visible. */
+	/** Canvas bounds of the chart area, or null when the window is not visible or the chart is expanded. */
 	public Rectangle getChartBounds()
 	{
-		if (!state.isOpen() || !isAttached() || chartArea.isHidden())
+		if (!state.isOpen() || !isAttached() || chartArea.isHidden() || expandedWindow.isOpen())
 		{
 			return null;
 		}
@@ -135,8 +130,11 @@ public class PriceWindow implements KeyListener
 
 		int itemId = state.getItemId();
 		ItemMapping mapping = prices.getMapping(itemId);
-		title.setText(mapping != null ? mapping.getName() : client.getItemDefinition(itemId).getName());
-		placeItemIcon(itemId);
+		String itemName = mapping != null ? mapping.getName() : client.getItemDefinition(itemId).getName();
+		int itemSprite = smallItemSprite.spriteFor(itemId);
+		titleBar.show(itemName, itemSprite);
+		tabs.select(state.getTimeframe());
+		expandedWindow.refresh(itemName, itemSprite);
 
 		LatestPrice latest = prices.getLatest(itemId);
 		Long high = latest == null ? null : latest.getHigh();
@@ -170,22 +168,6 @@ public class PriceWindow implements KeyListener
 		limitValue.setText(limit == null ? "-" : PriceFormat.exact(limit));
 		HourlyVolume hourly = prices.getHourly(itemId);
 		volumeValue.setText(hourly == null ? "-" : PriceFormat.exact(hourly.total()));
-
-		for (Map.Entry<Timeframe, Widget> tab : tabLabels.entrySet())
-		{
-			tab.getValue().setTextColor(tab.getKey() == state.getTimeframe() ? Palette.WHITE : Palette.ORANGE);
-		}
-	}
-
-	/** Puts the item icon just left of the centred title text. */
-	private void placeItemIcon(int itemId)
-	{
-		FontTypeFace font = title.getFont();
-		int textWidth = font != null ? font.getTextWidth(title.getText()) : title.getText().length() * 8;
-		int titleCenterX = title.getOriginalX() + title.getOriginalWidth() / 2;
-		itemIcon.setSpriteId(smallItemSprite.spriteFor(itemId));
-		itemIcon.setOriginalX(titleCenterX - textWidth / 2 - ICON_GAP - SmallItemSprite.WIDTH);
-		itemIcon.revalidate();
 	}
 
 	@Override
@@ -193,8 +175,19 @@ public class PriceWindow implements KeyListener
 	{
 		if (e.getKeyCode() == KeyEvent.VK_ESCAPE && state.isOpen())
 		{
+			// Esc first leaves the expanded chart, then closes Market Lens.
 			e.consume();
-			clientThread.invoke(this::close);
+			clientThread.invoke(() ->
+			{
+				if (expandedWindow.isOpen())
+				{
+					expandedWindow.close();
+				}
+				else
+				{
+					close();
+				}
+			});
 		}
 	}
 
@@ -240,20 +233,18 @@ public class PriceWindow implements KeyListener
 		// Swallow clicks and scrolls so nothing reaches the GE underneath.
 		root.setNoClickThrough(true);
 		root.setNoScrollThrough(true);
-		title = geWidgets.frame(root, w, h);
-		itemIcon = widgets.sprite(root, -1, 0, TITLE_CENTER_Y - SmallItemSprite.HEIGHT / 2,
-			SmallItemSprite.WIDTH, SmallItemSprite.HEIGHT);
-		MarketLensSprite brandIcon = MarketLensSprite.CHART_ICON_SMALL;
-		widgets.sprite(root, brandIcon.getSpriteId(), BRAND_LEFT, TITLE_CENTER_Y - brandIcon.getHeight() / 2,
-			brandIcon.getWidth(), brandIcon.getHeight());
-		widgets.text(root, "Market Lens", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT,
-			BRAND_LEFT + brandIcon.getWidth() + ICON_GAP, 6, 120, 24);
+		titleBar = new TitleBar(widgets, root, geWidgets.frame(root, w, h));
 		geWidgets.backArrow(root, h, this::close);
 		buildSummary(h);
-		buildTabs(w);
 
 		int chartX = PAD + SUMMARY_WIDTH + PAD;
 		int chartY = CHART_TOP;
+		int rowHeight = TimeframeTabs.height(widgets);
+		int rowY = CHART_TOP - rowHeight - TABS_TO_CHART;
+		tabs = new TimeframeTabs(widgets, root, chartX, rowY, state.getTimeframe(), this::selectTimeframe);
+		geWidgets.iconButton(root, MarketLensSprite.EXPAND_ICON, "Market Lens", "Expand",
+			w - PAD - EXPAND_BUTTON_WIDTH, rowY, EXPAND_BUTTON_WIDTH, rowHeight, this::expand);
+
 		chartArea = widgets.rect(root, Palette.CHART_BACKGROUND, 120, true, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
 		widgets.rect(root, Palette.DIVIDER, 0, false, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
 	}
@@ -288,35 +279,10 @@ public class PriceWindow implements KeyListener
 		return widgets.text(root, "-", FontID.PLAIN_11, Palette.WHITE, WidgetTextAlignment.RIGHT, x, y, w, ROW_HEIGHT);
 	}
 
-	private void buildTabs(int w)
+	private void expand()
 	{
-		tabLabels.clear();
-		Dimension leftSize = widgets.spriteSize(SpriteID.GeTextbackdrop.LEFT, new Dimension(5, 18));
-		Dimension rightSize = widgets.spriteSize(SpriteID.GeTextbackdrop.RIGHT, new Dimension(5, 18));
-		int tabHeight = leftSize.height;
-		int y = CHART_TOP - tabHeight - 4;
-		int x = w - PAD - Timeframe.values().length * (TAB_WIDTH + TAB_GAP) + TAB_GAP;
-
-		for (Timeframe timeframe : Timeframe.values())
-		{
-			widgets.sprite(root, SpriteID.GeTextbackdrop.LEFT, x, y, leftSize.width, tabHeight);
-			widgets.tiledSprite(root, SpriteID.GeTextbackdrop.MIDDLE, x + leftSize.width, y,
-				TAB_WIDTH - leftSize.width - rightSize.width, tabHeight);
-			widgets.sprite(root, SpriteID.GeTextbackdrop.RIGHT, x + TAB_WIDTH - rightSize.width, y, rightSize.width, tabHeight);
-
-			Widget label = widgets.text(root, timeframe.getLabel(), FontID.PLAIN_11, Palette.ORANGE,
-				WidgetTextAlignment.CENTER, x, y, TAB_WIDTH, tabHeight);
-			label.setName("<col=ff9040>" + timeframe.getLabel() + "</col>");
-			label.setAction(0, "View");
-			label.setHasListener(true);
-			label.setOnOpListener((JavaScriptCallback) e -> selectTimeframe(timeframe));
-			label.setOnMouseOverListener((JavaScriptCallback) e -> label.setTextColor(Palette.YELLOW));
-			label.setOnMouseLeaveListener((JavaScriptCallback) e ->
-				label.setTextColor(timeframe == state.getTimeframe() ? Palette.WHITE : Palette.ORANGE));
-			tabLabels.put(timeframe, label);
-
-			x += TAB_WIDTH + TAB_GAP;
-		}
+		expandedWindow.open(this::selectTimeframe);
+		refresh();
 	}
 
 	private void selectTimeframe(Timeframe timeframe)

@@ -116,7 +116,7 @@ public class GeButtonInjector
 
 		log.debug("Adding Market Lens button at {},{}", x, y);
 		return geWidgets.iconButton(parent, MarketLensSprite.CHART_ICON, NAME, "View prices", x, y,
-			() -> onClick.accept(currentItem()));
+			GeWidgets.SMALL_BUTTON_SIZE, GeWidgets.SMALL_BUTTON_SIZE, () -> onClick.accept(currentItem()));
 	}
 
 	private int currentItem()

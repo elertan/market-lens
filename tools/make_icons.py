@@ -1,7 +1,7 @@
-"""Generates the Market Lens icons: a green and a red price line, shaded like OSRS icons.
+"""Generates the Market Lens icons in an OSRS-like pixel style.
 
-Usage: python3 tools/make_chart_icon.py src/main/resources/com/marketlens/ui [preview-dir]
-Writes chart_icon.png (button) and chart_icon_small.png (title bar). Previews are scaled 8x.
+Usage: python3 tools/make_icons.py src/main/resources/com/marketlens/ui [preview-dir]
+Writes chart_icon.png (GE button), chart_icon_small.png (title bar) and expand_icon.png. Previews are scaled 8x.
 """
 import struct
 import sys
@@ -11,6 +11,8 @@ import zlib
 GREEN = {'light': (0x8C, 0xD8, 0x4A), 'base': (0x3A, 0x9A, 0x22)}
 RED = {'light': (0xF0, 0x86, 0x5C), 'base': (0xB0, 0x2E, 0x1E)}
 OUTLINE = (0x14, 0x10, 0x0A)
+# OSRS interface orange, as used by the timeframe tab labels.
+ORANGE = (0xFF, 0x98, 0x1F)
 
 # name -> (width, height, green zigzag like a price chart, how far lower the red line runs, line height)
 VARIANTS = {
@@ -86,12 +88,30 @@ def write_png(path, pixels, scale=1):
         f.write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
 
 
+def save(name, pixels):
+    write_png(f'{sys.argv[1]}/{name}.png', pixels)
+    if len(sys.argv) > 2:
+        write_png(f'{sys.argv[2]}/{name}.png', pixels, 8)
+
+
+def expand_icon(size=13, arm=4):
+    """Four L-shaped corners pointing outwards: the usual "expand to full screen" symbol."""
+    pixels = [[None] * size for _ in range(size)]
+    lo, hi = 1, size - 2  # leave a 1px margin for the outline
+    for cx in (lo, hi):
+        for cy in (lo, hi):
+            step_x = 1 if cx == lo else -1
+            step_y = 1 if cy == lo else -1
+            for i in range(arm):
+                pixels[cy][cx + i * step_x] = ORANGE  # horizontal arm
+                pixels[cy + i * step_y][cx] = ORANGE  # vertical arm
+    return add_outline(pixels)
+
+
 for name, (width, height, shape, red_offset, pen) in VARIANTS.items():
     pixels = [[None] * width for _ in range(height)]
     paint(pixels, line_mask([(x, y + red_offset) for x, y in shape], width, height, pen), RED, pen > 1)
     paint(pixels, line_mask(shape, width, height, pen), GREEN, pen > 1)
-    pixels = add_outline(pixels)
+    save(name, add_outline(pixels))
 
-    write_png(f'{sys.argv[1]}/{name}.png', pixels)
-    if len(sys.argv) > 2:
-        write_png(f'{sys.argv[2]}/{name}.png', pixels, 8)
+save('expand_icon', expand_icon())
