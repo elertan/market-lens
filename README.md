@@ -18,29 +18,6 @@ Chart controls: scroll to zoom (hold Shift or Ctrl to zoom around the cursor), d
 
 Price data comes from the [OSRS Wiki real-time prices API](https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices).
 
-## Design notes
-
-### Price data
-
-The plugin only asks the wiki for data while you use it, and never more often than the data can change:
-
-| Data | When | How often |
-| --- | --- | --- |
-| Live buy/sell price | Market Lens is open, or you hover the Market Lens button | Per item, at most once a minute (the API caches it for 60s) |
-| Chart series | Same | Per item and timeframe, at most once per bucket: 5 min (1H/6H/24H), 1 hour (1W), 6 hours (1M), 1 day (6M/1Y). A failed request retries after 5 seconds. |
-| Volume (1h) | Same | Summed from the item's 5-minute series, so no extra all-item download |
-| Item names and buy limits | Once per session | After a failure, retries wait 5s, 10s, 20s... up to 5 minutes |
-
-Requests run off the client thread, use RuneLite's HTTP client and send a User-Agent with this repository's URL, as the wiki asks.
-
-### Candlesticks
-
-The wiki API has no open/close prices or single-trade highs and lows, only each bucket's average instant-buy and instant-sell price. Candles are therefore built from those averages: a candle opens at the previous candle's close, closes at the midpoint of its last bucket, and its wicks run from the highest average instant-buy price to the lowest average instant-sell price. They show the trend and spread faithfully, but the wicks are averages rather than individual trades.
-
-### Why the expanded chart takes all clicks
-
-The expanded chart covers most of the game screen, including the minimap. Some parts of the game, like the minimap, react to a raw mouse click rather than to a menu option, so blocking click-through on the window's widgets isn't enough: clicking the close button over the minimap would also walk your character there. While the expanded chart is open, the plugin therefore takes every click inside it before the game sees it and handles its own buttons itself (`ExpandedWindowInput`). Mouse movement is left alone, so hover text keeps working, and nothing outside the window is affected.
-
 ## Development
 
 ```bash
