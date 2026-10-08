@@ -22,6 +22,7 @@ import net.runelite.api.gameval.SpriteID;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetTextAlignment;
+import net.runelite.api.widgets.WidgetType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.input.KeyListener;
 
@@ -211,8 +212,7 @@ public class PriceWindow implements KeyListener
 		int y = host.y - origin.getY() + (host.height - h) / 2;
 
 		root = widgets.layer(universe, x, y, w, h);
-		buildFrame(w, h);
-		buildTitleBar(w);
+		buildFrame(frame, w, h);
 		buildSummary(h);
 		buildTabs(w);
 
@@ -222,39 +222,48 @@ public class PriceWindow implements KeyListener
 		widgets.rect(root, Palette.DIVIDER, 0, false, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
 	}
 
-	private void buildFrame(int w, int h)
+	/**
+	 * Copies the GE's own frame (border, title bar, close button) so the window matches the game exactly.
+	 * Falls back to a plain title and close button if the GE frame cannot be read.
+	 */
+	private void buildFrame(Widget geFrame, int w, int h)
 	{
 		// Background swallows clicks and scrolls so nothing reaches the GE underneath.
 		Widget background = widgets.tiledSprite(root, SpriteID.TRADEBACKING_DARK, 0, 0, w, h);
 		background.setNoClickThrough(true);
 		background.setNoScrollThrough(true);
 
-		Dimension tl = widgets.spriteSize(SpriteID.Steelborder.TOP_LEFT, new Dimension(25, 30));
-		Dimension tr = widgets.spriteSize(SpriteID.Steelborder.TOP_RIGHT, new Dimension(25, 30));
-		Dimension bl = widgets.spriteSize(SpriteID.Steelborder.BOTTOM_LEFT, new Dimension(25, 30));
-		Dimension br = widgets.spriteSize(SpriteID.Steelborder.BOTTOM_RIGHT, new Dimension(25, 30));
-		Dimension edgeH = widgets.spriteSize(SpriteID.Steelborder2.EDGE_TOP, new Dimension(32, 6));
-		Dimension edgeV = widgets.spriteSize(SpriteID.Steelborder2.EDGE_RIGHT, new Dimension(6, 32));
+		title = null;
+		Widget close = null;
+		if (geFrame != null)
+		{
+			for (Widget part : widgets.copyLook(geFrame, root, 0, 0, w, h))
+			{
+				if (title == null && part.getType() == WidgetType.TEXT)
+				{
+					title = part;
+				}
+				else if (close == null && part.getType() == WidgetType.GRAPHIC && part.getSpriteId() == SpriteID.CloseButtons.BUTTON)
+				{
+					close = part;
+				}
+			}
+		}
 
-		widgets.tiledSprite(root, SpriteID.Steelborder2.EDGE_TOP, tl.width, 0, w - tl.width - tr.width, edgeH.height);
-		Widget bottom = widgets.tiledSprite(root, SpriteID.Steelborder2.EDGE_TOP, bl.width, h - edgeH.height, w - bl.width - br.width, edgeH.height);
-		bottom.setFlippedVertically(true);
-		widgets.tiledSprite(root, SpriteID.Steelborder2.EDGE_RIGHT, w - edgeV.width, tr.height, edgeV.width, h - tr.height - br.height);
-		Widget left = widgets.tiledSprite(root, SpriteID.Steelborder2.EDGE_RIGHT, 0, tl.height, edgeV.width, h - tl.height - bl.height);
-		left.setFlippedHorizontally(true);
-
-		widgets.sprite(root, SpriteID.Steelborder.TOP_LEFT, 0, 0, tl.width, tl.height);
-		widgets.sprite(root, SpriteID.Steelborder.TOP_RIGHT, w - tr.width, 0, tr.width, tr.height);
-		widgets.sprite(root, SpriteID.Steelborder.BOTTOM_LEFT, 0, h - bl.height, bl.width, bl.height);
-		widgets.sprite(root, SpriteID.Steelborder.BOTTOM_RIGHT, w - br.width, h - br.height, br.width, br.height);
+		if (title == null)
+		{
+			title = widgets.text(root, "", FontID.BOLD_12, Palette.ORANGE, WidgetTextAlignment.CENTER, 0, 6, w, 18);
+		}
+		if (close == null)
+		{
+			Dimension size = widgets.spriteSize(SpriteID.CloseButtons.BUTTON, new Dimension(26, 23));
+			close = widgets.sprite(root, SpriteID.CloseButtons.BUTTON, w - size.width - 6, 6, size.width, size.height);
+		}
+		makeCloseButton(close);
 	}
 
-	private void buildTitleBar(int w)
+	private void makeCloseButton(Widget close)
 	{
-		title = widgets.text(root, "", FontID.BOLD_12, Palette.ORANGE, WidgetTextAlignment.CENTER, 0, 6, w, 18);
-
-		Dimension size = widgets.spriteSize(SpriteID.CloseButtons.BUTTON, new Dimension(26, 23));
-		Widget close = widgets.sprite(root, SpriteID.CloseButtons.BUTTON, w - size.width - 6, 6, size.width, size.height);
 		close.setName("<col=ff9040>Market Lens</col>");
 		close.setAction(0, "Close");
 		close.setHasListener(true);

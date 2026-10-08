@@ -1,7 +1,7 @@
 package com.marketlens;
 
 import com.google.inject.Provides;
-import com.marketlens.ge.GeIconInjector;
+import com.marketlens.ge.GeButtonInjector;
 import com.marketlens.price.PriceService;
 import com.marketlens.ui.ChartInput;
 import com.marketlens.ui.ChartOverlay;
@@ -45,7 +45,7 @@ public class MarketLensPlugin extends Plugin
 	@Inject
 	private PriceService priceService;
 	@Inject
-	private GeIconInjector iconInjector;
+	private GeButtonInjector buttonInjector;
 	@Inject
 	private PriceWindow window;
 	@Inject
@@ -56,7 +56,9 @@ public class MarketLensPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		iconInjector.setOnClick(itemId -> window.open(itemId, config.defaultTimeframe()));
+		buttonInjector.setOnClick(itemId -> window.open(itemId, config.defaultTimeframe()));
+		// Start loading the chart as soon as an item is picked, so it is ready by the time the button is clicked.
+		buttonInjector.setOnItemShown(itemId -> priceService.getSeries(itemId, config.defaultTimeframe()));
 		priceService.setOnUpdate(() -> clientThread.invokeLater(window::refresh));
 		overlayManager.add(chartOverlay);
 		mouseManager.registerMouseListener(chartInput);
@@ -75,7 +77,7 @@ public class MarketLensPlugin extends Plugin
 		priceService.clear();
 		clientThread.invoke(() ->
 		{
-			iconInjector.reset();
+			buttonInjector.reset();
 			window.close();
 		});
 	}
@@ -83,7 +85,7 @@ public class MarketLensPlugin extends Plugin
 	@Subscribe
 	public void onClientTick(ClientTick event)
 	{
-		iconInjector.update();
+		buttonInjector.update();
 		window.ensureAttached();
 	}
 
@@ -104,7 +106,7 @@ public class MarketLensPlugin extends Plugin
 		if (event.getGroupId() == InterfaceID.GE_OFFERS)
 		{
 			window.close();
-			iconInjector.reset();
+			buttonInjector.reset();
 		}
 	}
 

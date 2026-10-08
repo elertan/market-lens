@@ -21,7 +21,7 @@ public class PriceService
 	private static final long LATEST_TTL_MS = TimeUnit.SECONDS.toMillis(60);
 	private static final long HOURLY_TTL_MS = TimeUnit.MINUTES.toMillis(5);
 	private static final long SERIES_TTL_MS = TimeUnit.MINUTES.toMillis(5);
-	private static final long SERIES_RETRY_MS = TimeUnit.SECONDS.toMillis(30);
+	private static final long SERIES_RETRY_MS = TimeUnit.SECONDS.toMillis(5);
 	private static final int MAX_CACHED_SERIES = 32;
 
 	public enum Status

@@ -2,7 +2,7 @@
 
 A RuneLite plugin that adds real-time Grand Exchange price charts to the GE offer screen.
 
-When you set up a buy or sell offer, a magnifier icon appears on the item. Click it to open the Market Lens window on top of the GE:
+When you set up a buy or sell offer, a **Market Lens** button appears right of the Confirm button. Click it to open the Market Lens window on top of the GE:
 
 - Instant buy and sell prices, with the time of the last trade
 - Margin, GE tax (2%, capped at 5M, exempt items handled) and profit per item
@@ -25,5 +25,5 @@ Price data comes from the [OSRS Wiki real-time prices API](https://oldschool.run
 | --- | --- |
 | `price` | Wiki API client, cache/refresh policy, GE tax |
 | `chart` | Pure chart maths: viewport (zoom/pan), axis ticks, formatting |
-| `ge` | Adds the icon to the GE offer setup screen |
+| `ge` | Adds the Market Lens button to the GE offer setup screen |
 | `ui` | Widget window, chart overlay, mouse input, shared chart state |

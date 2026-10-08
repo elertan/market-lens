@@ -9,6 +9,7 @@ import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.inject.Inject;
@@ -33,6 +34,8 @@ public class WikiPriceClient
 	private static final HttpUrl BASE_URL = HttpUrl.get("https://prices.runescape.wiki/api/v2/osrs/");
 	// The wiki blocks default Java user agents and asks for a descriptive one.
 	private static final String USER_AGENT = "market-lens RuneLite plugin";
+	// The timeseries endpoint is sometimes slow to answer; RuneLite's default timeout gives up too early.
+	private static final long READ_TIMEOUT_SECONDS = 30;
 
 	private static final Type LATEST_TYPE = new TypeToken<Map<Integer, LatestPrice>>() {}.getType();
 	private static final Type HOURLY_TYPE = new TypeToken<Map<Integer, HourlyVolume>>() {}.getType();
@@ -45,7 +48,7 @@ public class WikiPriceClient
 	@Inject
 	WikiPriceClient(OkHttpClient http, Gson gson)
 	{
-		this.http = http;
+		this.http = http.newBuilder().readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS).build();
 		this.gson = gson;
 	}
 

@@ -108,7 +108,7 @@ public class ChartOverlay extends Overlay
 			case LOADING:
 				return "Loading prices...";
 			case FAILED:
-				return "Price data unavailable";
+				return "Price data unavailable, retrying...";
 			default:
 				return "No trades in this period";
 		}
