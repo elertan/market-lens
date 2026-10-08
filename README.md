@@ -63,6 +63,10 @@ Prices come from the [OSRS Wiki real-time prices API](https://oldschool.runescap
 Market Lens only asks for data while its window is open, or when you point at its button, and only for that one item.
 Data is cached and never fetched more often than the wiki updates it. Requests only name the item; nothing about you or your account is sent.
 
+## Support
+
+Market Lens is free. If it helps your flipping, you can [buy me a coffee](https://buymeacoffee.com/elertan) ☕
+
 <details>
 <summary><b>Development</b></summary>
 
