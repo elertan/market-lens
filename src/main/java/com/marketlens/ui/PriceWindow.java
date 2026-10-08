@@ -16,6 +16,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
 import net.runelite.api.FontID;
+import net.runelite.api.FontTypeFace;
 import net.runelite.api.Point;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.SpriteID;
@@ -37,6 +38,9 @@ public class PriceWindow implements KeyListener
 	/** Content starts below the frame's title divider. */
 	private static final int CONTENT_TOP = 40;
 	private static final int CHART_TOP = CONTENT_TOP + 20;
+	/** Vertical centre of the title text in the frame's title bar. */
+	private static final int TITLE_CENTER_Y = 18;
+	private static final int ICON_GAP = 4;
 	/** Left inset of the muted "Market Lens" text in the title bar, where the GE shows its History button. */
 	private static final int BRAND_LEFT = 12;
 	private static final int PAD = 10;
@@ -129,7 +133,7 @@ public class PriceWindow implements KeyListener
 		int itemId = state.getItemId();
 		ItemMapping mapping = prices.getMapping(itemId);
 		title.setText(mapping != null ? mapping.getName() : client.getItemDefinition(itemId).getName());
-		itemIcon.setItemId(itemId);
+		placeItemIcon(itemId);
 
 		LatestPrice latest = prices.getLatest(itemId);
 		Long high = latest == null ? null : latest.getHigh();
@@ -168,6 +172,17 @@ public class PriceWindow implements KeyListener
 		{
 			tab.getValue().setTextColor(tab.getKey() == state.getTimeframe() ? Palette.WHITE : Palette.ORANGE);
 		}
+	}
+
+	/** Puts the item icon just left of the centred title text. */
+	private void placeItemIcon(int itemId)
+	{
+		FontTypeFace font = title.getFont();
+		int textWidth = font != null ? font.getTextWidth(title.getText()) : title.getText().length() * 8;
+		int titleCenterX = title.getOriginalX() + title.getOriginalWidth() / 2;
+		itemIcon.setItemId(itemId);
+		itemIcon.setOriginalX(titleCenterX - textWidth / 2 - ICON_GAP - GeWidgets.ITEM_WIDTH);
+		itemIcon.revalidate();
 	}
 
 	@Override
@@ -223,6 +238,7 @@ public class PriceWindow implements KeyListener
 		root.setNoClickThrough(true);
 		root.setNoScrollThrough(true);
 		title = geWidgets.frame(root, w, h);
+		itemIcon = geWidgets.itemIcon(root, 0, TITLE_CENTER_Y - GeWidgets.ITEM_HEIGHT / 2);
 		widgets.text(root, "Market Lens", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, BRAND_LEFT, 6, 120, 24);
 		geWidgets.backArrow(root, h, this::close);
 		buildSummary(h);
@@ -246,11 +262,6 @@ public class PriceWindow implements KeyListener
 		widgets.text(root, "Sell price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 54, w, 14);
 		sellValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.SELL, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 68, w, 20);
 		sellAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 88, w, 14);
-
-		// Item slot right-aligned beside the buy/sell prices, vertically centred on them.
-		int pricesHeight = 102;
-		itemIcon = geWidgets.itemSlot(root, x + w - GeWidgets.ITEM_SLOT_WIDTH,
-			CONTENT_TOP + (pricesHeight - GeWidgets.ITEM_SLOT_HEIGHT) / 2);
 
 		widgets.rect(root, Palette.DIVIDER, 0, true, x, CONTENT_TOP + 108, w, 1);
 

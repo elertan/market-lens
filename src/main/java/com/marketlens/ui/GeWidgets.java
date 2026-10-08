@@ -40,12 +40,9 @@ public class GeWidgets
 	private static final int BACK_ARROW_BOTTOM = 47;
 	private static final int BACK_ARROW_HOVER_OPACITY = 100;
 
-	/** The GE's item slot: a 40x36 box with the 36x32 item graphic inset by 2px. */
-	public static final int ITEM_SLOT_WIDTH = 40;
-	public static final int ITEM_SLOT_HEIGHT = 36;
-	private static final int ITEM_INSET = 2;
-	private static final int ITEM_WIDTH = 36;
-	private static final int ITEM_HEIGHT = 32;
+	/** Item icons are 36x32, as in inventories and GE slots. */
+	public static final int ITEM_WIDTH = 36;
+	public static final int ITEM_HEIGHT = 32;
 
 	private final WidgetFactory widgets;
 
@@ -121,11 +118,10 @@ public class GeWidgets
 		return arrow;
 	}
 
-	/** The GE's item slot box. Returns the item graphic; set the item on it with {@link Widget#setItemId}. */
-	public Widget itemSlot(Widget parent, int x, int y)
+	/** A bare item icon without a quantity. Set the item on it with {@link Widget#setItemId}. */
+	public Widget itemIcon(Widget parent, int x, int y)
 	{
-		widgets.sprite(parent, SpriteID.GeItembackdrop.BOX, x, y, ITEM_SLOT_WIDTH, ITEM_SLOT_HEIGHT);
-		Widget item = widgets.sprite(parent, -1, x + ITEM_INSET, y + ITEM_INSET, ITEM_WIDTH, ITEM_HEIGHT);
+		Widget item = widgets.sprite(parent, -1, x, y, ITEM_WIDTH, ITEM_HEIGHT);
 		item.setItemQuantityMode(ItemQuantityMode.NEVER);
 		return item;
 	}
