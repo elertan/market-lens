@@ -16,6 +16,7 @@ import java.awt.Shape;
 import java.awt.RenderingHints;
 import java.awt.Stroke;
 import java.awt.geom.Path2D;
+import java.awt.geom.Rectangle2D;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,8 @@ public class ChartOverlay extends Overlay
 	private static final int MIN_PX_PER_TIME_TICK = 64;
 	private static final int MIN_PX_PER_DOT = 5;
 	private static final int DOT_SIZE = 3;
+	/** Vertical padding inside axis label boxes, top and bottom combined. */
+	private static final int LABEL_PADDING = 6;
 
 	private static final Stroke LINE = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
 	private static final Stroke DASHED = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
@@ -143,6 +146,7 @@ public class ChartOverlay extends Overlay
 		private final Rectangle volumePane;
 		private final List<TimeseriesPoint> points;
 		private final long bucket = state.getBucketSeconds();
+		private final Rectangle2D digitBounds;
 		private final double start = state.getViewport().getStart();
 		private final double end = state.getViewport().getEnd();
 		private final int first;
@@ -154,6 +158,7 @@ public class ChartOverlay extends Overlay
 		Frame(Graphics2D g, Rectangle area, Rectangle plot, List<TimeseriesPoint> points)
 		{
 			this.g = g;
+			this.digitBounds = g.getFont().createGlyphVector(g.getFontRenderContext(), "0123456789").getVisualBounds();
 			this.area = area;
 			this.plot = plot;
 			this.points = points;
@@ -207,7 +212,6 @@ public class ChartOverlay extends Overlay
 			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			List<Tag> tags = layoutTags();
 			drawPriceGrid(tags);
-			drawVolumeScale();
 			drawTimeGrid();
 
 			Shape clip = g.getClip();
@@ -248,7 +252,6 @@ public class ChartOverlay extends Overlay
 			List<Double> ticks = AxisTicks.prices(min, max, Math.max(2, pricePane.height / MIN_PX_PER_PRICE_TICK));
 			double step = ticks.size() > 1 ? ticks.get(1) - ticks.get(0) : 1;
 			int labelX = plot.x + plot.width + 4;
-			int ascent = g.getFontMetrics().getAscent();
 			for (double tick : ticks)
 			{
 				int y = y(tick);
@@ -256,18 +259,9 @@ public class ChartOverlay extends Overlay
 				g.drawLine(plot.x, y, plot.x + plot.width, y);
 				if (tags.stream().noneMatch(tag -> Math.abs(tag.labelY - y) < labelHeight()))
 				{
-					drawText(g, PriceFormat.axis(tick, step), labelX, y + ascent / 2 - 1, Palette.AXIS_TEXT);
+					drawText(g, PriceFormat.axis(tick, step), labelX, baselineFor(y), Palette.AXIS_TEXT);
 				}
 			}
-		}
-
-		/** Top of the volume pane: a grid line and the largest visible volume, so the bars have a scale. */
-		private void drawVolumeScale()
-		{
-			g.setColor(Palette.GRID);
-			g.drawLine(plot.x, volumePane.y, plot.x + plot.width, volumePane.y);
-			int ascent = g.getFontMetrics().getAscent();
-			drawText(g, PriceFormat.compact(maxVolume), plot.x + plot.width + 4, volumePane.y + ascent, Palette.AXIS_TEXT);
 		}
 
 		/** Vertical grid + bottom axis labels. */
@@ -409,7 +403,13 @@ public class ChartOverlay extends Overlay
 
 		private int labelHeight()
 		{
-			return g.getFontMetrics().getAscent() + 4;
+			return (int) Math.ceil(digitBounds.getHeight()) + LABEL_PADDING;
+		}
+
+		/** Baseline that puts digits visually centred on {@code centerY}, using their real pixel bounds. */
+		private int baselineFor(int centerY)
+		{
+			return centerY - (int) Math.round(digitBounds.getY() + digitBounds.getHeight() / 2);
 		}
 
 		/** Crosshair snapped to the nearest bucket. Returns that bucket, or null when not hovering. */
@@ -439,9 +439,10 @@ public class ChartOverlay extends Overlay
 			int w = fm.stringWidth(time) + 8;
 			int boxX = Math.max(area.x, Math.min(x - w / 2, plot.x + plot.width - w));
 			int boxY = plot.y + plot.height + 1;
+			int boxHeight = TIME_AXIS_HEIGHT - 2;
 			g.setColor(Palette.LABEL_BACKGROUND);
-			g.fillRect(boxX, boxY, w, TIME_AXIS_HEIGHT - 2);
-			drawText(g, time, boxX + 4, boxY + fm.getAscent() + 1, Palette.TEXT);
+			g.fillRect(boxX, boxY, w, boxHeight);
+			drawText(g, time, boxX + 4, baselineFor(boxY + boxHeight / 2), Palette.TEXT);
 			return nearest;
 		}
 
@@ -461,12 +462,11 @@ public class ChartOverlay extends Overlay
 
 		private void drawAxisBox(String text, int x, int centerY, Color background, Color foreground)
 		{
-			FontMetrics fm = g.getFontMetrics();
 			int h = labelHeight();
 			g.setColor(background);
 			g.fillRect(x, centerY - h / 2, PRICE_AXIS_WIDTH - 2, h);
 			g.setColor(foreground);
-			g.drawString(text, x + 3, centerY + fm.getAscent() / 2 - 1);
+			g.drawString(text, x + 3, baselineFor(centerY));
 		}
 
 		/** "High 828,861  Low 808,000  Vol 16" for the hovered or newest bucket. */

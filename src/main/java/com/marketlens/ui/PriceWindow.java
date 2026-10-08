@@ -37,6 +37,8 @@ public class PriceWindow implements KeyListener
 	/** Content starts below the frame's title divider. */
 	private static final int CONTENT_TOP = 40;
 	private static final int CHART_TOP = CONTENT_TOP + 20;
+	/** Left inset of the muted "Market Lens" text in the title bar, where the GE shows its History button. */
+	private static final int BRAND_LEFT = 12;
 	private static final int PAD = 10;
 	private static final int SUMMARY_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
@@ -219,6 +221,7 @@ public class PriceWindow implements KeyListener
 		root.setNoClickThrough(true);
 		root.setNoScrollThrough(true);
 		title = geWidgets.frame(root, w, h);
+		widgets.text(root, "Market Lens", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, BRAND_LEFT, 6, 120, 24);
 		geWidgets.backArrow(root, h, this::close);
 		buildSummary(h);
 		buildTabs(w);
