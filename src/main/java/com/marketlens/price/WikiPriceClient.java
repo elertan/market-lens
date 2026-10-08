@@ -93,6 +93,11 @@ public class WikiPriceClient
 		return byId;
 	}
 
+	private static long elapsedMs(long startedNanos)
+	{
+		return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
+	}
+
 	private static HttpUrl url(String endpoint)
 	{
 		return BASE_URL.newBuilder().addPathSegment(endpoint).build();
@@ -105,12 +110,13 @@ public class WikiPriceClient
 			.header("User-Agent", USER_AGENT)
 			.build();
 
+		long started = System.nanoTime();
 		http.newCall(request).enqueue(new Callback()
 		{
 			@Override
 			public void onFailure(Call call, IOException e)
 			{
-				log.debug("Request to {} failed", url, e);
+				log.debug("Request to {} failed after {} ms", url, elapsedMs(started), e);
 				onFailure.run();
 			}
 
@@ -121,11 +127,13 @@ public class WikiPriceClient
 				{
 					if (!response.isSuccessful() || body == null)
 					{
-						log.debug("Request to {} returned HTTP {}", url, response.code());
+						log.debug("Request to {} returned HTTP {} after {} ms", url, response.code(), elapsedMs(started));
 						onFailure.run();
 						return;
 					}
-					onSuccess.accept(parser.apply(body.charStream()));
+					T result = parser.apply(body.charStream());
+					log.debug("Request to {} took {} ms", url, elapsedMs(started));
+					onSuccess.accept(result);
 				}
 				catch (RuntimeException e)
 				{

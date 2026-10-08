@@ -17,7 +17,7 @@ import lombok.Value;
  * Caches wiki price data and decides when to fetch it. Data is only fetched for the item the user is looking at
  * (or about to look at), and never more often than it can change:
  * <ul>
- * <li>live price: per item, at most once a minute (the API caches it for 60s)</li>
+ * <li>live price: per item, at most once a minute (the API caches it for 60s); failed fetches retry after 5s</li>
  * <li>price series: per item and lookback, at most once per bucket of that series; failed fetches retry after 5s</li>
  * <li>item names and buy limits: once per session, with growing delays between failed attempts</li>
  * </ul>
@@ -27,6 +27,7 @@ import lombok.Value;
 public class PriceService
 {
 	private static final long LATEST_TTL_MS = TimeUnit.SECONDS.toMillis(60);
+	private static final long LATEST_RETRY_MS = TimeUnit.SECONDS.toMillis(5);
 	private static final long SERIES_RETRY_MS = TimeUnit.SECONDS.toMillis(5);
 	private static final long MAPPING_RETRY_MIN_MS = TimeUnit.SECONDS.toMillis(5);
 	private static final long MAPPING_RETRY_MAX_MS = TimeUnit.MINUTES.toMillis(5);
@@ -210,7 +211,8 @@ public class PriceService
 				}
 				onUpdate.run();
 			},
-			() -> {});
+			// Backdate the attempt so the next one comes after the short retry delay, not a full minute.
+			() -> latestFetchedAt.put(itemId, clock.getAsLong() - LATEST_TTL_MS + LATEST_RETRY_MS));
 	}
 
 	private void complete(String key, Series result)

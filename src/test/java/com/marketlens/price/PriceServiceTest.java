@@ -44,6 +44,20 @@ public class PriceServiceTest
 	}
 
 	@Test
+	public void failedLivePriceRetriesAfterFiveSeconds()
+	{
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		client.failLatest();
+		now += TimeUnit.SECONDS.toMillis(4);
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		assertEquals(1, client.count("latest"));
+
+		now += TimeUnit.SECONDS.toMillis(2);
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		assertEquals(2, client.count("latest"));
+	}
+
+	@Test
 	public void seriesIsRefreshedOncePerBucket()
 	{
 		service.getSeries(ITEM, Timeframe.ONE_YEAR);
@@ -121,6 +135,7 @@ public class PriceServiceTest
 	{
 		private final List<String> requests = new ArrayList<>();
 		private final List<Runnable> mappingFailures = new ArrayList<>();
+		private final List<Runnable> latestFailures = new ArrayList<>();
 		private final Map<String, Consumer<List<TimeseriesPoint>>> seriesSuccess = new HashMap<>();
 		private final List<Runnable> seriesFailures = new ArrayList<>();
 
@@ -133,6 +148,7 @@ public class PriceServiceTest
 		public void fetchLatest(int itemId, Consumer<LatestPrice> onSuccess, Runnable onFailure)
 		{
 			requests.add("latest");
+			latestFailures.add(onFailure);
 		}
 
 		@Override
@@ -155,6 +171,11 @@ public class PriceServiceTest
 		int count(String request)
 		{
 			return Collections.frequency(requests, request);
+		}
+
+		void failLatest()
+		{
+			latestFailures.remove(latestFailures.size() - 1).run();
 		}
 
 		void failMapping()
