@@ -26,7 +26,7 @@ public class ChartScaleTest
 	@Test
 	public void visibleSliceKeepsOnePointOfSlackEachSide()
 	{
-		ChartScale scale = new ChartScale(series(10), 250, 550, 100, PLOT);
+		ChartScale scale = new ChartScale(series(10), 250, 550, 100, PLOT, true);
 		assertEquals(2, scale.getFirst());
 		assertEquals(6, scale.getLast());
 	}
@@ -35,7 +35,7 @@ public class ChartScaleTest
 	public void priceRangeIsPaddedByEightPercent()
 	{
 		// Visible points 2..6: lows from 92, highs up to 106 -> range 14, padding 1.12
-		ChartScale scale = new ChartScale(series(10), 250, 550, 100, PLOT);
+		ChartScale scale = new ChartScale(series(10), 250, 550, 100, PLOT, true);
 		assertEquals(92 - 1.12, scale.getMin(), EPS);
 		assertEquals(106 + 1.12, scale.getMax(), EPS);
 	}
@@ -43,17 +43,17 @@ public class ChartScaleTest
 	@Test
 	public void livePricesAreFittedOnlyWhenTheNewestPointIsVisible()
 	{
-		ChartScale atEnd = new ChartScale(series(10), 500, 900, 100, PLOT, 150.0, null);
+		ChartScale atEnd = new ChartScale(series(10), 500, 900, 100, PLOT, true, 150.0, null);
 		assertEquals(150.0, atEnd.getMax() - (150 - 94) * 0.08, EPS);
 
-		ChartScale inPast = new ChartScale(series(10), 0, 300, 100, PLOT, 150.0, null);
+		ChartScale inPast = new ChartScale(series(10), 0, 300, 100, PLOT, true, 150.0, null);
 		assertEquals(104 + 14 * 0.08, inPast.getMax(), EPS);
 	}
 
 	@Test
 	public void pixelMappingRoundTrips()
 	{
-		ChartScale scale = new ChartScale(series(10), 0, 900, 100, PLOT);
+		ChartScale scale = new ChartScale(series(10), 0, 900, 100, PLOT, true);
 		assertEquals(0, scale.x(0));
 		assertEquals(1000, scale.x(900));
 		assertEquals(450, scale.timeAt(scale.x(450)), 1);
@@ -63,7 +63,7 @@ public class ChartScaleTest
 	@Test
 	public void nearestPicksTheClosestVisiblePoint()
 	{
-		ChartScale scale = new ChartScale(series(10), 0, 900, 100, PLOT);
+		ChartScale scale = new ChartScale(series(10), 0, 900, 100, PLOT, true);
 		assertEquals(300, scale.nearest(340).getTimestamp());
 		assertEquals(400, scale.nearest(360).getTimestamp());
 	}

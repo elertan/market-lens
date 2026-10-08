@@ -3,6 +3,7 @@ package com.marketlens;
 import com.google.inject.Provides;
 import com.marketlens.ge.GeButtonInjector;
 import com.marketlens.price.PriceService;
+import com.marketlens.price.Timeframe;
 import com.marketlens.ui.ChartCursor;
 import com.marketlens.ui.ChartInput;
 import com.marketlens.ui.ExpandedChartOverlay;
@@ -18,6 +19,7 @@ import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.KeyManager;
@@ -67,9 +69,9 @@ public class MarketLensPlugin extends Plugin
 	protected void startUp()
 	{
 		spriteManager.addSpriteOverrides(MarketLensSprite.values());
-		buttonInjector.setOnClick(itemId -> window.open(itemId, config.defaultTimeframe(), config.chartType()));
+		buttonInjector.setOnClick(itemId -> window.open(itemId, openingTimeframe(), config.chartType()));
 		// Start loading as soon as the user points at the button, so the data is usually ready by the click.
-		buttonInjector.setOnHover(itemId -> priceService.refresh(itemId, config.defaultTimeframe()));
+		buttonInjector.setOnHover(itemId -> priceService.refresh(itemId, openingTimeframe()));
 		priceService.setOnUpdate(() -> clientThread.invokeLater(window::refresh));
 		overlayManager.add(chartOverlay);
 		overlayManager.add(expandedChartOverlay);
@@ -114,6 +116,16 @@ public class MarketLensPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (MarketLensConfig.GROUP.equals(event.getGroup()))
+		{
+			// The chart reads the config every frame; the window's price texts need a refresh for new colours.
+			clientThread.invoke(window::refresh);
+		}
+	}
+
+	@Subscribe
 	public void onWidgetClosed(WidgetClosed event)
 	{
 		if (event.getGroupId() == InterfaceID.GE_OFFERS)
@@ -121,6 +133,11 @@ public class MarketLensPlugin extends Plugin
 			window.close();
 			buttonInjector.reset();
 		}
+	}
+
+	private Timeframe openingTimeframe()
+	{
+		return config.rememberTimeframe() ? config.lastTimeframe() : config.defaultTimeframe();
 	}
 
 	@Provides

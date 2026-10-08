@@ -51,6 +51,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 	private final SmallItemSprite smallItemSprite;
 	private final ExpandedChartWindow expandedWindow;
 	private final ConfigManager configManager;
+	private final MarketLensConfig config;
 
 	private Widget chartArea;
 	private TitleBar titleBar;
@@ -69,7 +70,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 	@Inject
 	PriceWindow(Client client, ClientThread clientThread, PriceService prices, ChartState state, WidgetFactory widgets,
 		GeWidgets geWidgets, SmallItemSprite smallItemSprite, ExpandedChartWindow expandedWindow,
-		ConfigManager configManager)
+		ConfigManager configManager, MarketLensConfig config)
 	{
 		super(widgets, geWidgets);
 		this.client = client;
@@ -79,6 +80,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 		this.smallItemSprite = smallItemSprite;
 		this.expandedWindow = expandedWindow;
 		this.configManager = configManager;
+		this.config = config;
 	}
 
 	public void open(int itemId, Timeframe timeframe, ChartType chartType)
@@ -151,6 +153,11 @@ public class PriceWindow extends GeWindow implements KeyListener
 		chartTypeToggle.select(state.getChartType());
 		expandedWindow.refresh(itemName, itemSprite);
 
+		int buyColor = config.buyColor().getRGB() & 0xFFFFFF;
+		int sellColor = config.sellColor().getRGB() & 0xFFFFFF;
+		buyValue.setTextColor(buyColor);
+		sellValue.setTextColor(sellColor);
+
 		LatestPrice latest = prices.getLatest(itemId);
 		Long high = latest == null ? null : latest.getHigh();
 		Long low = latest == null ? null : latest.getLow();
@@ -166,7 +173,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 			marginValue.setText(PriceFormat.signed(margin));
 			taxValue.setText(tax == 0 ? "0" : "-" + PriceFormat.exact(tax));
 			profitValue.setText(PriceFormat.signed(profit));
-			profitValue.setTextColor(profit > 0 ? Palette.BUY : profit < 0 ? Palette.SELL : Palette.WHITE);
+			profitValue.setTextColor(profit > 0 ? buyColor : profit < 0 ? sellColor : Palette.WHITE);
 		}
 		else
 		{
@@ -272,11 +279,11 @@ public class PriceWindow extends GeWindow implements KeyListener
 		int w = SUMMARY_WIDTH - 4;
 
 		widgets.text(root, "Buy price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, CONTENT_TOP, w, 14);
-		buyValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.BUY, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 14, w, 20);
+		buyValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.WHITE, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 14, w, 20);
 		buyAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 34, w, 14);
 
 		widgets.text(root, "Sell price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 54, w, 14);
-		sellValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.SELL, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 68, w, 20);
+		sellValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.WHITE, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 68, w, 20);
 		sellAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 88, w, 14);
 
 		widgets.rect(root, Palette.DIVIDER, 0, true, x, CONTENT_TOP + 108, w, 1);
@@ -310,9 +317,11 @@ public class PriceWindow extends GeWindow implements KeyListener
 		refresh();
 	}
 
+	/** Switches the timeframe in both windows and stores it for the "Remember last timeframe" option. */
 	private void selectTimeframe(Timeframe timeframe)
 	{
 		state.setTimeframe(timeframe);
+		configManager.setConfiguration(MarketLensConfig.GROUP, MarketLensConfig.LAST_TIMEFRAME_KEY, timeframe);
 		prices.refresh(state.getItemId(), timeframe);
 		refresh();
 	}

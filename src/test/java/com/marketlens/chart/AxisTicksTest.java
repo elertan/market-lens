@@ -49,9 +49,18 @@ public class AxisTicksTest
 	@Test
 	public void timeLabels()
 	{
-		assertEquals("01:00", AxisTicks.timeLabel(3_600, 3_600, UTC));
-		assertEquals("2 Jan", AxisTicks.timeLabel(86_400, 3_600, UTC));
-		assertEquals("2 Jan", AxisTicks.timeLabel(86_400, 86_400, UTC));
-		assertEquals("Jan '70", AxisTicks.timeLabel(86_400, 30 * 86_400, UTC));
+		assertEquals("01:00", AxisTicks.timeLabel(3_600, 3_600, UTC, false));
+		assertEquals("2 Jan", AxisTicks.timeLabel(86_400, 3_600, UTC, false));
+		assertEquals("2 Jan", AxisTicks.timeLabel(86_400, 86_400, UTC, false));
+		assertEquals("Jan '70", AxisTicks.timeLabel(86_400, 30 * 86_400, UTC, false));
+	}
+
+	@Test
+	public void twelveHourLabels()
+	{
+		assertEquals("1:00 PM", AxisTicks.timeLabel(13 * 3_600, 3_600, UTC, true));
+		assertEquals("2 Jan", AxisTicks.timeLabel(86_400, 3_600, UTC, true));
+		assertEquals("Thu 1 Jan 1:00 PM", AxisTicks.crosshairLabel(13 * 3_600, 300, UTC, true));
+		assertEquals("Thu 1 Jan 13:00", AxisTicks.crosshairLabel(13 * 3_600, 300, UTC, false));
 	}
 }

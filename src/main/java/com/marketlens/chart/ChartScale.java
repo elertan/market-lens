@@ -42,10 +42,11 @@ public final class ChartScale
 	 * @param points     the series, oldest first; not empty
 	 * @param start      visible window start, epoch seconds
 	 * @param end        visible window end, epoch seconds
+	 * @param withVolume whether to keep a volume pane below the prices; without it the prices use the full height
 	 * @param livePrices current prices to fit on the scale when the newest point is visible (nulls ignored)
 	 */
 	public ChartScale(List<TimeseriesPoint> points, double start, double end, long bucketSeconds, Rectangle plot,
-		Double... livePrices)
+		boolean withVolume, Double... livePrices)
 	{
 		this.points = points;
 		this.start = start;
@@ -53,8 +54,9 @@ public final class ChartScale
 		this.bucketSeconds = bucketSeconds;
 		this.plot = plot;
 
-		int volumeHeight = (int) (plot.height * VOLUME_FRACTION);
-		pricePane = new Rectangle(plot.x, plot.y, plot.width, plot.height - volumeHeight - PANE_GAP);
+		int volumeHeight = withVolume ? (int) (plot.height * VOLUME_FRACTION) : 0;
+		int gap = withVolume ? PANE_GAP : 0;
+		pricePane = new Rectangle(plot.x, plot.y, plot.width, plot.height - volumeHeight - gap);
 		volumePane = new Rectangle(plot.x, plot.y + plot.height - volumeHeight, plot.width, volumeHeight);
 
 		int lo = 0;

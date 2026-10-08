@@ -54,6 +54,9 @@ public class ChartRenderer
 	private static final int MIN_PX_PER_CANDLE = 5;
 	/** Candle body width as a fraction of the space per candle. */
 	private static final double CANDLE_BODY_FRACTION = 0.6;
+	/** Volume bars and the dashed live-price lines use the buy/sell colour, partly transparent. */
+	private static final int VOLUME_ALPHA = 110;
+	private static final int TAG_LINE_ALPHA = 140;
 	private static final int DOT_SIZE = 3;
 
 	private static final Stroke LINE = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
@@ -130,8 +133,8 @@ public class ChartRenderer
 			}
 
 			LatestPrice latest = prices.getLatest(state.getItemId());
-			Long offerPrice = offer.priceFor(state.getItemId());
-			ChartScale scale = new ChartScale(points, start, end, interval, plot,
+			Long offerPrice = config.showOfferLine() ? offer.priceFor(state.getItemId()) : null;
+			ChartScale scale = new ChartScale(points, start, end, interval, plot, config.showVolume(),
 				latest == null || latest.getHigh() == null ? null : latest.getHigh().doubleValue(),
 				latest == null || latest.getLow() == null ? null : latest.getLow().doubleValue(),
 				offerPrice == null ? null : offerPrice.doubleValue());
@@ -185,6 +188,11 @@ public class ChartRenderer
 		}
 	}
 
+	private static Color withAlpha(Color color, int alpha)
+	{
+		return new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha);
+	}
+
 	/** One frame of chart drawing, in back-to-front order. */
 	private final class Frame
 	{
@@ -201,6 +209,10 @@ public class ChartRenderer
 		private final LatestPrice latest;
 		/** Price chosen on the GE offer screen, or null. */
 		private final Long offerPrice;
+		/** Colours and options from the config, read once per frame. */
+		private final Color buy;
+		private final Color sell;
+		private final boolean twelveHour;
 
 		Frame(Graphics2D g, ChartText text, Rectangle area, ChartScale scale, List<TimeseriesPoint> points,
 			List<Candle> candles, long interval, LatestPrice latest, Long offerPrice)
@@ -215,6 +227,9 @@ public class ChartRenderer
 			this.interval = interval;
 			this.latest = latest;
 			this.offerPrice = offerPrice;
+			this.buy = config.buyColor();
+			this.sell = config.sellColor();
+			this.twelveHour = config.timeFormat().isTwelveHour();
 		}
 
 		void draw()
@@ -226,15 +241,18 @@ public class ChartRenderer
 
 			Shape clip = g.getClip();
 			g.clip(plot);
-			drawVolume();
+			if (scale.getVolumePane().height > 0)
+			{
+				drawVolume();
+			}
 			if (candles != null)
 			{
 				drawCandles();
 			}
 			else
 			{
-				drawLine(TimeseriesPoint::getAvgHighPrice, Palette.BUY_COLOR);
-				drawLine(TimeseriesPoint::getAvgLowPrice, Palette.SELL_COLOR);
+				drawLine(TimeseriesPoint::getAvgHighPrice, buy);
+				drawLine(TimeseriesPoint::getAvgLowPrice, sell);
 			}
 			g.setClip(clip);
 
@@ -260,7 +278,7 @@ public class ChartRenderer
 				int x = scale.x(c.getTimestamp());
 				int top = scale.y(Math.max(c.getOpen(), c.getClose()));
 				int bottom = scale.y(Math.min(c.getOpen(), c.getClose()));
-				g.setColor(c.isUp() ? Palette.BUY_COLOR : Palette.SELL_COLOR);
+				g.setColor(c.isUp() ? buy : sell);
 				g.drawLine(x, scale.y(c.getHigh()), x, scale.y(c.getLow()));
 				g.fillRect(x - body / 2, top, body, Math.max(1, bottom - top + 1));
 			}
@@ -299,7 +317,7 @@ public class ChartRenderer
 				g.setColor(Palette.GRID);
 				g.drawLine(x, plot.y, x, plot.y + plot.height);
 
-				String label = AxisTicks.timeLabel(tick, step, zone);
+				String label = AxisTicks.timeLabel(tick, step, zone, twelveHour);
 				int labelX = x - text.width(label) / 2;
 				if (labelX >= area.x && labelX + text.width(label) <= plot.x + plot.width)
 				{
@@ -314,15 +332,17 @@ public class ChartRenderer
 			Rectangle pane = scale.getVolumePane();
 			int barWidth = Math.max(1, (int) scale.bucketWidth() - 1);
 			int bottom = pane.y + pane.height;
+			Color buyVolume = withAlpha(buy, VOLUME_ALPHA);
+			Color sellVolume = withAlpha(sell, VOLUME_ALPHA);
 			for (int i = scale.getFirst(); i <= scale.getLast(); i++)
 			{
 				TimeseriesPoint p = points.get(i);
 				int x = scale.x(p.getTimestamp()) - barWidth / 2;
 				int buyHeight = scale.volumeHeight(p.getHighPriceVolume());
 				int sellHeight = scale.volumeHeight(p.getLowPriceVolume());
-				g.setColor(Palette.BUY_VOLUME);
+				g.setColor(buyVolume);
 				g.fillRect(x, bottom - buyHeight, barWidth, buyHeight);
-				g.setColor(Palette.SELL_VOLUME);
+				g.setColor(sellVolume);
 				g.fillRect(x, bottom - buyHeight - sellHeight, barWidth, sellHeight);
 			}
 		}
@@ -383,8 +403,8 @@ public class ChartRenderer
 			List<Tag> tags = new ArrayList<>();
 			if (latest != null)
 			{
-				addTag(tags, latest.getHigh(), Palette.BUY_COLOR, Palette.BUY_TAG_LINE);
-				addTag(tags, latest.getLow(), Palette.SELL_COLOR, Palette.SELL_TAG_LINE);
+				addTag(tags, latest.getHigh(), buy, withAlpha(buy, TAG_LINE_ALPHA));
+				addTag(tags, latest.getLow(), sell, withAlpha(sell, TAG_LINE_ALPHA));
 			}
 			addTag(tags, offerPrice, Palette.OFFER_COLOR, Palette.OFFER_TAG_LINE);
 
@@ -453,7 +473,7 @@ public class ChartRenderer
 					Palette.LABEL_BACKGROUND, Palette.TEXT);
 			}
 
-			String time = AxisTicks.crosshairLabel(nearest.getTimestamp(), interval, zone);
+			String time = AxisTicks.crosshairLabel(nearest.getTimestamp(), interval, zone, twelveHour);
 			int w = text.width(time) + 8;
 			int boxX = Math.max(area.x, Math.min(x - w / 2, plot.x + plot.width - w));
 			int boxY = plot.y + plot.height + 1;
@@ -479,12 +499,12 @@ public class ChartRenderer
 				x = legendItem("O ", c.getOpen(), Palette.TEXT, x, y);
 				x = legendItem("H ", c.getHigh(), Palette.TEXT, x, y);
 				x = legendItem("L ", c.getLow(), Palette.TEXT, x, y);
-				x = legendItem("C ", c.getClose(), c.isUp() ? Palette.BUY_COLOR : Palette.SELL_COLOR, x, y);
+				x = legendItem("C ", c.getClose(), c.isUp() ? buy : sell, x, y);
 			}
 			else
 			{
-				x = legendItem("High ", p.getAvgHighPrice(), Palette.BUY_COLOR, x, y);
-				x = legendItem("Low ", p.getAvgLowPrice(), Palette.SELL_COLOR, x, y);
+				x = legendItem("High ", p.getAvgHighPrice(), buy, x, y);
+				x = legendItem("Low ", p.getAvgLowPrice(), sell, x, y);
 			}
 			text.draw("Vol ", x, y, Palette.TEXT_MUTED);
 			text.draw(PriceFormat.exact(p.totalVolume()), x + text.width("Vol "), y, Palette.TEXT);

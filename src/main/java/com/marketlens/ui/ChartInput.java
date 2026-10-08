@@ -1,5 +1,6 @@
 package com.marketlens.ui;
 
+import com.marketlens.MarketLensConfig;
 import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
@@ -20,13 +21,15 @@ public class ChartInput implements MouseListener, MouseWheelListener
 
 	private final ChartState state;
 	private final ChartCursor cursor;
+	private final MarketLensConfig config;
 	private int dragLastX = -1;
 
 	@Inject
-	ChartInput(ChartState state, ChartCursor cursor)
+	ChartInput(ChartState state, ChartCursor cursor, MarketLensConfig config)
 	{
 		this.state = state;
 		this.cursor = cursor;
+		this.config = config;
 	}
 
 	@Override
@@ -112,7 +115,7 @@ public class ChartInput implements MouseListener, MouseWheelListener
 		{
 			state.clearHover();
 		}
-		cursor.update(overPlot);
+		cursor.update(overPlot && config.crossCursor());
 		return e;
 	}
 

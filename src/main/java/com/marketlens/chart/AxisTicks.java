@@ -20,10 +20,12 @@ public final class AxisTicks
 		DAY, 2 * DAY, 7 * DAY, 14 * DAY, 30 * DAY, 61 * DAY, 91 * DAY, 182 * DAY,
 	};
 
-	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
+	private static final DateTimeFormatter CLOCK_24H = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
+	private static final DateTimeFormatter CLOCK_12H = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
 	private static final DateTimeFormatter DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
 	private static final DateTimeFormatter MONTH_YEAR = DateTimeFormatter.ofPattern("MMM ''yy", Locale.ENGLISH);
-	private static final DateTimeFormatter CROSSHAIR_INTRADAY = DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ENGLISH);
+	private static final DateTimeFormatter CROSSHAIR_INTRADAY_24H = DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ENGLISH);
+	private static final DateTimeFormatter CROSSHAIR_INTRADAY_12H = DateTimeFormatter.ofPattern("EEE d MMM h:mm a", Locale.ENGLISH);
 	private static final DateTimeFormatter CROSSHAIR_DAILY = DateTimeFormatter.ofPattern("EEE d MMM ''yy", Locale.ENGLISH);
 
 	private AxisTicks()
@@ -90,21 +92,25 @@ public final class AxisTicks
 	}
 
 	/** Axis label: clock time for intraday steps (date at midnight), day-month or month-year otherwise. */
-	public static String timeLabel(long epochSeconds, long step, ZoneId zone)
+	public static String timeLabel(long epochSeconds, long step, ZoneId zone, boolean twelveHour)
 	{
 		ZonedDateTime t = Instant.ofEpochSecond(epochSeconds).atZone(zone);
 		if (step < DAY)
 		{
 			boolean midnight = t.getHour() == 0 && t.getMinute() == 0;
-			return (midnight ? DAY_MONTH : CLOCK).format(t);
+			return (midnight ? DAY_MONTH : twelveHour ? CLOCK_12H : CLOCK_24H).format(t);
 		}
 		return (step < 30 * DAY ? DAY_MONTH : MONTH_YEAR).format(t);
 	}
 
 	/** Full timestamp for the crosshair label. */
-	public static String crosshairLabel(long epochSeconds, long bucketSeconds, ZoneId zone)
+	public static String crosshairLabel(long epochSeconds, long bucketSeconds, ZoneId zone, boolean twelveHour)
 	{
 		ZonedDateTime t = Instant.ofEpochSecond(epochSeconds).atZone(zone);
-		return (bucketSeconds < DAY ? CROSSHAIR_INTRADAY : CROSSHAIR_DAILY).format(t);
+		if (bucketSeconds >= DAY)
+		{
+			return CROSSHAIR_DAILY.format(t);
+		}
+		return (twelveHour ? CROSSHAIR_INTRADAY_12H : CROSSHAIR_INTRADAY_24H).format(t);
 	}
 }
