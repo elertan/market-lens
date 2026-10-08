@@ -16,7 +16,7 @@ import net.runelite.api.widgets.Widget;
  * {@link ExpandedWindowInput}, which calls {@link #clickAt}. Client thread only, except {@link #getBounds}.
  */
 @Singleton
-public class ExpandedChartWindow
+public class ExpandedChartWindow extends GeWindow
 {
 	/** Distance from the canvas edges, so a bit of the game stays visible around the window. */
 	private static final int MARGIN = 24;
@@ -25,14 +25,10 @@ public class ExpandedChartWindow
 	private static final int TABS_TO_CHART = 4;
 
 	private final Client client;
-	private final WidgetFactory widgets;
-	private final GeWidgets geWidgets;
 	private final ChartState state;
 
 	private boolean open;
 	private Consumer<Timeframe> onSelectTimeframe = tf -> {};
-	private Widget parent;
-	private Widget root;
 	private Widget chartArea;
 	private TitleBar titleBar;
 	private TimeframeTabs tabs;
@@ -42,15 +38,12 @@ public class ExpandedChartWindow
 	 * new widgets only get a screen position once the client has drawn them.
 	 */
 	private volatile Rectangle bounds;
-	private int builtWidth;
-	private int builtHeight;
 
 	@Inject
 	ExpandedChartWindow(Client client, WidgetFactory widgets, GeWidgets geWidgets, ChartState state)
 	{
+		super(widgets, geWidgets);
 		this.client = client;
-		this.widgets = widgets;
-		this.geWidgets = geWidgets;
 		this.state = state;
 	}
 
@@ -63,20 +56,52 @@ public class ExpandedChartWindow
 	public void open(Consumer<Timeframe> onSelectTimeframe)
 	{
 		this.onSelectTimeframe = onSelectTimeframe;
-		open = true;
-		build();
+		open = attach();
 	}
 
 	public void close()
 	{
 		open = false;
-		removeWidgets();
+		detach();
+		bounds = null;
+	}
+
+	/**
+	 * Every client tick: rebuilds the window if the game discarded it or the canvas was resized,
+	 * and records where it is on screen.
+	 *
+	 * @return true if it was rebuilt, so the caller should refresh its content
+	 */
+	public boolean ensureAttached()
+	{
+		if (!open)
+		{
+			return false;
+		}
+		boolean rebuilt = reattachIfLost();
+		bounds = rootBounds();
+		return rebuilt;
 	}
 
 	/** Canvas bounds of the whole window, or null when it is closed. Safe to call from any thread. */
 	public Rectangle getBounds()
 	{
 		return bounds;
+	}
+
+	/** Canvas bounds of the chart area, or null when the window is not showing. */
+	public Rectangle getChartBounds()
+	{
+		return open && isAttached() ? chartArea.getBounds() : null;
+	}
+
+	public void refresh(String itemName, int itemSpriteId)
+	{
+		if (open && isAttached())
+		{
+			titleBar.show(itemName, itemSpriteId);
+			tabs.select(state.getTimeframe());
+		}
 	}
 
 	/** Performs a left click at canvas point x,y: the close button or a timeframe tab. */
@@ -99,94 +124,12 @@ public class ExpandedChartWindow
 	}
 
 	/**
-	 * Rebuilds the window if the game discarded our widgets or the canvas was resized.
-	 *
-	 * @return true if it was rebuilt, so the caller should refresh its content
-	 */
-	public boolean ensureAttached()
-	{
-		if (!open)
-		{
-			return false;
-		}
-		boolean rebuilt = !isAttached();
-		if (rebuilt)
-		{
-			removeWidgets();
-			build();
-		}
-		bounds = root == null ? null : root.getBounds();
-		return rebuilt;
-	}
-
-	/** Canvas bounds of the chart area, or null when the window is not showing. */
-	public Rectangle getChartBounds()
-	{
-		return open && isAttached() ? chartArea.getBounds() : null;
-	}
-
-	public void refresh(String itemName, int itemSpriteId)
-	{
-		if (open && isAttached())
-		{
-			titleBar.show(itemName, itemSpriteId);
-			tabs.select(state.getTimeframe());
-		}
-	}
-
-	private void build()
-	{
-		parent = topLayer();
-		if (parent == null)
-		{
-			open = false;
-			return;
-		}
-
-		builtWidth = parent.getWidth();
-		builtHeight = parent.getHeight();
-		int w = builtWidth - 2 * MARGIN;
-		int h = builtHeight - 2 * MARGIN;
-
-		root = widgets.layer(parent, MARGIN, MARGIN, w, h);
-		// Swallow clicks and scrolls so nothing reaches the game underneath.
-		root.setNoClickThrough(true);
-		root.setNoScrollThrough(true);
-		titleBar = new TitleBar(widgets, root, geWidgets.frame(root, w, h));
-		closeButton = geWidgets.closeButton(root, w, this::close);
-
-		tabs = new TimeframeTabs(widgets, root, PAD, CONTENT_TOP, state.getTimeframe(), onSelectTimeframe);
-		int chartTop = CONTENT_TOP + TimeframeTabs.height(widgets) + TABS_TO_CHART;
-		chartArea = widgets.rect(root, Palette.CHART_BACKGROUND, 120, true, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
-		widgets.rect(root, Palette.DIVIDER, 0, false, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
-	}
-
-	private void removeWidgets()
-	{
-		if (root != null)
-		{
-			root.deleteAllChildren();
-			root.setHidden(true);
-		}
-		root = null;
-		bounds = null;
-	}
-
-	private boolean isAttached()
-	{
-		return root != null
-			&& parent == topLayer()
-			&& parent.getChild(root.getIndex()) == root
-			&& parent.getWidth() == builtWidth
-			&& parent.getHeight() == builtHeight;
-	}
-
-	/**
 	 * The top-level interface's UI highlights layer. It spans the whole canvas and is drawn after everything
 	 * else, so the window covers the game view, chat box and side panels, and blocks mouse input to them.
 	 * Every client layout (fixed, resizable classic/modern, ...) has one.
 	 */
-	private Widget topLayer()
+	@Override
+	protected Widget findHost()
 	{
 		switch (client.getTopLevelInterfaceId())
 		{
@@ -205,5 +148,22 @@ public class ExpandedChartWindow
 			default:
 				return null;
 		}
+	}
+
+	@Override
+	protected Rectangle placement(Widget host)
+	{
+		return new Rectangle(MARGIN, MARGIN, host.getWidth() - 2 * MARGIN, host.getHeight() - 2 * MARGIN);
+	}
+
+	@Override
+	protected void buildContent(Widget root, int w, int h)
+	{
+		titleBar = new TitleBar(widgets, root, geWidgets.frame(root, w, h));
+		closeButton = geWidgets.closeButton(root, w, this::close);
+
+		tabs = new TimeframeTabs(widgets, root, PAD, CONTENT_TOP, state.getTimeframe(), onSelectTimeframe);
+		int chartTop = CONTENT_TOP + TimeframeTabs.height(widgets) + TABS_TO_CHART;
+		chartArea = geWidgets.chartPanel(root, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
 	}
 }

@@ -32,13 +32,12 @@ import okhttp3.ResponseBody;
 public class WikiPriceClient
 {
 	private static final HttpUrl BASE_URL = HttpUrl.get("https://prices.runescape.wiki/api/v2/osrs/");
-	// The wiki blocks default Java user agents and asks for a descriptive one.
-	private static final String USER_AGENT = "market-lens RuneLite plugin";
+	// The wiki blocks default Java user agents and asks for a descriptive one with a way to get in touch.
+	private static final String USER_AGENT = "market-lens RuneLite plugin - https://github.com/elertan/market-lens";
 	// The timeseries endpoint is sometimes slow to answer; RuneLite's default timeout gives up too early.
 	private static final long READ_TIMEOUT_SECONDS = 30;
 
 	private static final Type LATEST_TYPE = new TypeToken<Map<Integer, LatestPrice>>() {}.getType();
-	private static final Type HOURLY_TYPE = new TypeToken<Map<Integer, HourlyVolume>>() {}.getType();
 	private static final Type TIMESERIES_TYPE = new TypeToken<List<TimeseriesPoint>>() {}.getType();
 	private static final Type MAPPING_TYPE = new TypeToken<List<ItemMapping>>() {}.getType();
 
@@ -52,14 +51,14 @@ public class WikiPriceClient
 		this.gson = gson;
 	}
 
-	public void fetchLatest(Consumer<Map<Integer, LatestPrice>> onSuccess, Runnable onFailure)
+	/** Live price of one item. Calls back with null if the item has no recent trades. */
+	public void fetchLatest(int itemId, Consumer<LatestPrice> onSuccess, Runnable onFailure)
 	{
-		get(url("latest"), r -> parseData(gson, r, LATEST_TYPE), onSuccess, onFailure);
-	}
-
-	public void fetchHourly(Consumer<Map<Integer, HourlyVolume>> onSuccess, Runnable onFailure)
-	{
-		get(url("1h"), r -> parseData(gson, r, HOURLY_TYPE), onSuccess, onFailure);
+		HttpUrl url = url("latest").newBuilder()
+			.addQueryParameter("id", Integer.toString(itemId))
+			.build();
+		get(url, r -> WikiPriceClient.<Map<Integer, LatestPrice>>parseData(gson, r, LATEST_TYPE).get(itemId),
+			onSuccess, onFailure);
 	}
 
 	public void fetchMapping(Consumer<Map<Integer, ItemMapping>> onSuccess, Runnable onFailure)

@@ -32,9 +32,8 @@ public class GeButtonInjector
 	private final GeWidgets geWidgets;
 
 	private Widget button;
-	private int shownItemId = -1;
 	private IntConsumer onClick = id -> {};
-	private IntConsumer onItemShown = id -> {};
+	private IntConsumer onHover = id -> {};
 
 	@Inject
 	GeButtonInjector(Client client, ItemManager itemManager, GeWidgets geWidgets)
@@ -49,10 +48,10 @@ public class GeButtonInjector
 		this.onClick = onClick;
 	}
 
-	/** Called once per item while its setup screen is shown; lets the plugin prefetch prices before the click. */
-	public void setOnItemShown(IntConsumer onItemShown)
+	/** Called when the mouse moves onto the button; lets the plugin start loading prices before the click. */
+	public void setOnHover(IntConsumer onHover)
 	{
-		this.onItemShown = onItemShown;
+		this.onHover = onHover;
 	}
 
 	/** Cheap enough to run every client tick: does nothing while the button is in place. */
@@ -64,14 +63,7 @@ public class GeButtonInjector
 		if (setup == null || setup.isHidden() || confirm == null || confirm.isHidden() || itemId <= 0)
 		{
 			hide();
-			shownItemId = -1;
 			return;
-		}
-
-		if (itemId != shownItemId)
-		{
-			shownItemId = itemId;
-			onItemShown.accept(itemManager.canonicalize(itemId));
 		}
 
 		Widget parent = confirm.getParent();
@@ -95,7 +87,6 @@ public class GeButtonInjector
 	{
 		hide();
 		button = null;
-		shownItemId = -1;
 	}
 
 	private Widget createButton(Widget parent, Widget confirm)
@@ -116,7 +107,8 @@ public class GeButtonInjector
 
 		log.debug("Adding Market Lens button at {},{}", x, y);
 		return geWidgets.iconButton(parent, MarketLensSprite.CHART_ICON, NAME, "View prices", x, y,
-			GeWidgets.SMALL_BUTTON_SIZE, GeWidgets.SMALL_BUTTON_SIZE, () -> onClick.accept(currentItem()));
+			GeWidgets.SMALL_BUTTON_SIZE, GeWidgets.SMALL_BUTTON_SIZE,
+			() -> onClick.accept(currentItem()), () -> onHover.accept(currentItem()));
 	}
 
 	private int currentItem()

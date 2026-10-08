@@ -2,7 +2,6 @@ package com.marketlens.ui;
 
 import com.marketlens.chart.PriceFormat;
 import com.marketlens.price.GeTax;
-import com.marketlens.price.HourlyVolume;
 import com.marketlens.price.ItemMapping;
 import com.marketlens.price.LatestPrice;
 import com.marketlens.price.PriceService;
@@ -27,7 +26,7 @@ import net.runelite.client.input.KeyListener;
  * opens it in the {@link ExpandedChartWindow}. Client thread only, except {@link #keyPressed}.
  */
 @Singleton
-public class PriceWindow implements KeyListener
+public class PriceWindow extends GeWindow implements KeyListener
 {
 	/** Content starts below the frame's title divider. */
 	private static final int CONTENT_TOP = 40;
@@ -45,12 +44,9 @@ public class PriceWindow implements KeyListener
 	private final ClientThread clientThread;
 	private final PriceService prices;
 	private final ChartState state;
-	private final WidgetFactory widgets;
-	private final GeWidgets geWidgets;
 	private final SmallItemSprite smallItemSprite;
 	private final ExpandedChartWindow expandedWindow;
 
-	private Widget root;
 	private Widget chartArea;
 	private TitleBar titleBar;
 	private TimeframeTabs tabs;
@@ -68,12 +64,11 @@ public class PriceWindow implements KeyListener
 	PriceWindow(Client client, ClientThread clientThread, PriceService prices, ChartState state, WidgetFactory widgets,
 		GeWidgets geWidgets, SmallItemSprite smallItemSprite, ExpandedChartWindow expandedWindow)
 	{
+		super(widgets, geWidgets);
 		this.client = client;
 		this.clientThread = clientThread;
 		this.prices = prices;
 		this.state = state;
-		this.widgets = widgets;
-		this.geWidgets = geWidgets;
 		this.smallItemSprite = smallItemSprite;
 		this.expandedWindow = expandedWindow;
 	}
@@ -81,49 +76,56 @@ public class PriceWindow implements KeyListener
 	public void open(int itemId, Timeframe timeframe)
 	{
 		state.open(itemId, timeframe);
-		build();
-		refresh();
+		prices.refresh(itemId, timeframe);
+		if (attach())
+		{
+			refresh();
+		}
+		else
+		{
+			state.close();
+		}
 	}
 
 	public void close()
 	{
 		expandedWindow.close();
 		state.close();
-		if (isAttached())
-		{
-			root.deleteAllChildren();
-			root.setHidden(true);
-		}
-		root = null;
-		chartArea = null;
+		detach();
 		smallItemSprite.clear();
 	}
 
-	/** Rebuilds the window if the game discarded our widgets while it should be open. */
+	/** Every client tick: rebuilds the windows if the game discarded their widgets while they should be open. */
 	public void ensureAttached()
 	{
-		if (state.isOpen() && !isAttached())
+		boolean rebuilt = state.isOpen() && reattachIfLost();
+		if (expandedWindow.ensureAttached() || rebuilt)
 		{
-			build();
 			refresh();
 		}
-		if (expandedWindow.ensureAttached())
+	}
+
+	/** Every game tick while open: keeps the prices current and the "Traded ... ago" texts ticking. */
+	public void onGameTick()
+	{
+		if (state.isOpen())
 		{
-			refresh();
+			prices.refresh(state.getItemId(), state.getTimeframe());
+			refreshTradeAges();
 		}
 	}
 
 	/** Canvas bounds of the chart area, or null when the window is not visible or the chart is expanded. */
 	public Rectangle getChartBounds()
 	{
-		if (!state.isOpen() || !isAttached() || chartArea.isHidden() || expandedWindow.isOpen())
+		if (!state.isOpen() || !isAttached() || expandedWindow.isOpen())
 		{
 			return null;
 		}
 		return chartArea.getBounds();
 	}
 
-	/** Updates all text from the latest cached prices. */
+	/** Updates everything shown from the cached price data. Called when the window opens and when data arrives. */
 	public void refresh()
 	{
 		if (!state.isOpen() || !isAttached())
@@ -142,12 +144,9 @@ public class PriceWindow implements KeyListener
 		LatestPrice latest = prices.getLatest(itemId);
 		Long high = latest == null ? null : latest.getHigh();
 		Long low = latest == null ? null : latest.getLow();
-		long now = System.currentTimeMillis() / 1000;
-
 		buyValue.setText(high == null ? "-" : PriceFormat.exact(high));
-		buyAge.setText(high == null ? "" : "Traded " + PriceFormat.age(now - latest.getHighTime()));
 		sellValue.setText(low == null ? "-" : PriceFormat.exact(low));
-		sellAge.setText(low == null ? "" : "Traded " + PriceFormat.age(now - latest.getLowTime()));
+		refreshTradeAges();
 
 		if (high != null && low != null)
 		{
@@ -169,8 +168,21 @@ public class PriceWindow implements KeyListener
 
 		Integer limit = mapping == null ? null : mapping.getLimit();
 		limitValue.setText(limit == null ? "-" : PriceFormat.exact(limit));
-		HourlyVolume hourly = prices.getHourly(itemId);
-		volumeValue.setText(hourly == null ? "-" : PriceFormat.exact(hourly.total()));
+		Long hourVolume = prices.getHourVolume(itemId);
+		volumeValue.setText(hourVolume == null ? "-" : PriceFormat.exact(hourVolume));
+	}
+
+	/** Only the "Traded ... ago" texts, which change with time rather than with data. */
+	private void refreshTradeAges()
+	{
+		if (!state.isOpen() || !isAttached())
+		{
+			return;
+		}
+		LatestPrice latest = prices.getLatest(state.getItemId());
+		long now = System.currentTimeMillis() / 1000;
+		buyAge.setText(latest == null || latest.getHigh() == null ? "" : "Traded " + PriceFormat.age(now - latest.getHighTime()));
+		sellAge.setText(latest == null || latest.getLow() == null ? "" : "Traded " + PriceFormat.age(now - latest.getLowTime()));
 	}
 
 	@Override
@@ -204,56 +216,44 @@ public class PriceWindow implements KeyListener
 	{
 	}
 
-	private boolean isAttached()
+	@Override
+	protected Widget findHost()
 	{
-		if (root == null)
-		{
-			return false;
-		}
-		Widget parent = client.getWidget(InterfaceID.GeOffers.UNIVERSE);
-		return parent != null && parent.getChild(root.getIndex()) == root;
+		return client.getWidget(InterfaceID.GeOffers.UNIVERSE);
 	}
 
-	private void build()
+	/** Exactly over the GE's own frame, so the window replaces the GE view rather than floating on the screen. */
+	@Override
+	protected Rectangle placement(Widget universe)
 	{
-		Widget universe = client.getWidget(InterfaceID.GeOffers.UNIVERSE);
-		if (universe == null)
-		{
-			state.close();
-			return;
-		}
-
-		// Centre on the GE frame so the window sits on top of the GE, not the whole screen.
 		Widget frame = client.getWidget(InterfaceID.GeOffers.FRAME);
-		Rectangle host = frame != null ? frame.getBounds() : universe.getBounds();
+		Rectangle target = frame != null ? frame.getBounds() : universe.getBounds();
 		Point origin = universe.getCanvasLocation();
-		int w = Math.min(GeWidgets.FRAME_WIDTH, host.width);
-		int h = Math.min(GeWidgets.FRAME_HEIGHT, host.height);
-		int x = host.x - origin.getX() + (host.width - w) / 2;
-		int y = host.y - origin.getY() + (host.height - h) / 2;
+		int w = Math.min(GeWidgets.FRAME_WIDTH, target.width);
+		int h = Math.min(GeWidgets.FRAME_HEIGHT, target.height);
+		return new Rectangle(target.x - origin.getX() + (target.width - w) / 2,
+			target.y - origin.getY() + (target.height - h) / 2, w, h);
+	}
 
-		root = widgets.layer(universe, x, y, w, h);
-		// Swallow clicks and scrolls so nothing reaches the GE underneath.
-		root.setNoClickThrough(true);
-		root.setNoScrollThrough(true);
+	@Override
+	protected void buildContent(Widget root, int w, int h)
+	{
 		titleBar = new TitleBar(widgets, root, geWidgets.frame(root, w, h));
 		geWidgets.backArrow(root, h, this::close);
-		buildSummary(h);
+		buildSummary(root);
 
 		int chartX = PAD + SUMMARY_WIDTH + PAD;
-		int chartY = CHART_TOP;
 		int rowY = CHART_TOP - TAB_ROW_HEIGHT - TABS_TO_CHART;
 		int tabsY = rowY + (TAB_ROW_HEIGHT - TimeframeTabs.height(widgets)) / 2;
 		tabs = new TimeframeTabs(widgets, root, chartX, tabsY, state.getTimeframe(), this::selectTimeframe);
 		geWidgets.iconButton(root, MarketLensSprite.EXPAND_ICON, "Market Lens", "Expand",
 			w - PAD - EXPAND_BUTTON_WIDTH, rowY + (TAB_ROW_HEIGHT - EXPAND_BUTTON_HEIGHT) / 2,
-			EXPAND_BUTTON_WIDTH, EXPAND_BUTTON_HEIGHT, this::expand);
+			EXPAND_BUTTON_WIDTH, EXPAND_BUTTON_HEIGHT, this::expand, () -> {});
 
-		chartArea = widgets.rect(root, Palette.CHART_BACKGROUND, 120, true, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
-		widgets.rect(root, Palette.DIVIDER, 0, false, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
+		chartArea = geWidgets.chartPanel(root, chartX, CHART_TOP, w - chartX - PAD, h - CHART_TOP - PAD);
 	}
 
-	private void buildSummary(int h)
+	private void buildSummary(Widget root)
 	{
 		int x = PAD + 4;
 		int w = SUMMARY_WIDTH - 4;
@@ -269,15 +269,15 @@ public class PriceWindow implements KeyListener
 		widgets.rect(root, Palette.DIVIDER, 0, true, x, CONTENT_TOP + 108, w, 1);
 
 		int y = CONTENT_TOP + 114;
-		marginValue = row("Margin", x, y, w);
-		taxValue = row("GE tax", x, y += ROW_HEIGHT, w);
-		profitValue = row("Profit / item", x, y += ROW_HEIGHT, w);
+		marginValue = row(root, "Margin", x, y, w);
+		taxValue = row(root, "GE tax", x, y += ROW_HEIGHT, w);
+		profitValue = row(root, "Profit / item", x, y += ROW_HEIGHT, w);
 		widgets.rect(root, Palette.DIVIDER, 0, true, x, y + ROW_HEIGHT + 3, w, 1);
-		limitValue = row("Buy limit", x, y += ROW_HEIGHT + 7, w);
-		volumeValue = row("Volume (1h)", x, y + ROW_HEIGHT, w);
+		limitValue = row(root, "Buy limit", x, y += ROW_HEIGHT + 7, w);
+		volumeValue = row(root, "Volume (1h)", x, y + ROW_HEIGHT, w);
 	}
 
-	private Widget row(String label, int x, int y, int w)
+	private Widget row(Widget root, String label, int x, int y, int w)
 	{
 		widgets.text(root, label, FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, y, w, ROW_HEIGHT);
 		return widgets.text(root, "-", FontID.PLAIN_11, Palette.WHITE, WidgetTextAlignment.RIGHT, x, y, w, ROW_HEIGHT);
@@ -292,6 +292,7 @@ public class PriceWindow implements KeyListener
 	private void selectTimeframe(Timeframe timeframe)
 	{
 		state.setTimeframe(timeframe);
+		prices.refresh(state.getItemId(), timeframe);
 		refresh();
 	}
 }

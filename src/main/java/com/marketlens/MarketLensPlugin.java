@@ -11,7 +11,6 @@ import com.marketlens.ui.MarketLensSprite;
 import com.marketlens.ui.PriceWindow;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.WidgetClosed;
@@ -34,8 +33,6 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class MarketLensPlugin extends Plugin
 {
-	@Inject
-	private Client client;
 	@Inject
 	private ClientThread clientThread;
 	@Inject
@@ -68,8 +65,8 @@ public class MarketLensPlugin extends Plugin
 	{
 		spriteManager.addSpriteOverrides(MarketLensSprite.values());
 		buttonInjector.setOnClick(itemId -> window.open(itemId, config.defaultTimeframe()));
-		// Start loading the chart as soon as an item is picked, so it is ready by the time the button is clicked.
-		buttonInjector.setOnItemShown(itemId -> priceService.getSeries(itemId, config.defaultTimeframe()));
+		// Start loading as soon as the user points at the button, so the data is usually ready by the click.
+		buttonInjector.setOnHover(itemId -> priceService.refresh(itemId, config.defaultTimeframe()));
 		priceService.setOnUpdate(() -> clientThread.invokeLater(window::refresh));
 		overlayManager.add(chartOverlay);
 		overlayManager.add(expandedChartOverlay);
@@ -109,12 +106,7 @@ public class MarketLensPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (client.getWidget(InterfaceID.GeOffers.UNIVERSE) != null)
-		{
-			priceService.refreshIfStale();
-			// Keeps the "Traded 2m ago" texts current.
-			window.refresh();
-		}
+		window.onGameTick();
 	}
 
 	@Subscribe

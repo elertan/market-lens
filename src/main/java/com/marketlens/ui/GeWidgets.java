@@ -35,6 +35,9 @@ public class GeWidgets
 	private static final int CLOSE_BUTTON_WIDTH = 26;
 	private static final int CLOSE_BUTTON_HEIGHT = 23;
 
+	/** Opacity of the chart panel's dark fill (0 = opaque, 255 = invisible), so the stone backing shows through a little. */
+	private static final int CHART_PANEL_OPACITY = 120;
+
 	private static final int BACK_ARROW_WIDTH = 30;
 	private static final int BACK_ARROW_HEIGHT = 23;
 	/** Back arrow position in the GE frame, measured from the left and bottom edges. */
@@ -81,11 +84,11 @@ public class GeWidgets
 
 	/**
 	 * An icon-only small GE button, like the guide-price button: the GE button sprite with {@code icon} centred
-	 * on it. Hovering shows the GE's hover sprite and the menu shows "action name". At most 35x35; a smaller button
+	 * on it. Hovering shows the GE's hover sprite, runs {@code onHover} and the menu shows "action name". At most 35x35; a smaller button
 	 * shows the four corners of the sprite through clipping layers, so its bevelled edges stay intact.
 	 */
 	public Widget iconButton(Widget parent, MarketLensSprite icon, String name, String action,
-		int x, int y, int w, int h, Runnable onClick)
+		int x, int y, int w, int h, Runnable onClick, Runnable onHover)
 	{
 		Widget button = widgets.layer(parent, x, y, w, h);
 		List<Widget> background = new ArrayList<>(4);
@@ -102,7 +105,11 @@ public class GeWidgets
 			icon.getWidth(), icon.getHeight());
 
 		makeClickable(button, name, action, onClick);
-		button.setOnMouseOverListener((JavaScriptCallback) e -> setSprite(background, SpriteID.GeIcons.BUTTON_HOVERED));
+		button.setOnMouseOverListener((JavaScriptCallback) e ->
+		{
+			setSprite(background, SpriteID.GeIcons.BUTTON_HOVERED);
+			onHover.run();
+		});
 		button.setOnMouseLeaveListener((JavaScriptCallback) e -> setSprite(background, SpriteID.GeIcons.BUTTON));
 		return button;
 	}
@@ -116,6 +123,14 @@ public class GeWidgets
 		close.setOnMouseOverListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.HOVERED));
 		close.setOnMouseLeaveListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.BUTTON));
 		return close;
+	}
+
+	/** A dark, bordered panel for a chart. The chart is drawn by an overlay inside the returned widget's bounds. */
+	public Widget chartPanel(Widget parent, int x, int y, int w, int h)
+	{
+		Widget panel = widgets.rect(parent, Palette.CHART_BACKGROUND, CHART_PANEL_OPACITY, true, x, y, w, h);
+		widgets.rect(parent, Palette.DIVIDER, 0, false, x, y, w, h);
+		return panel;
 	}
 
 	/** The GE's bottom-left back arrow, placed where the GE places it inside a frame of height {@code frameHeight}. */
