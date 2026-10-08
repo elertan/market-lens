@@ -55,6 +55,10 @@ The icons are generated pixel art. To change them, edit [`tools/make_icons.py`](
 python3 tools/make_icons.py
 ```
 
+Other icon designs that were considered (candlesticks, price tags, an eye, ...) are kept in
+[`tools/icon_concepts.py`](tools/icon_concepts.py); their PNGs and an overview sheet are in
+[`tools/icon-concepts/`](tools/icon-concepts/). Regenerate them with `python3 tools/icon_concepts.py`.
+
 | Package | Contents |
 | --- | --- |
 | `price` | Wiki API client, cache/refresh policy, GE tax |
