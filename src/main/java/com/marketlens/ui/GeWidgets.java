@@ -9,6 +9,7 @@ import net.runelite.api.gameval.SpriteID;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetTextAlignment;
+import net.runelite.client.callback.ClientThread;
 
 /**
  * Builders for widgets in the Grand Exchange's visual style. Sprites, sizes and offsets match
@@ -43,11 +44,13 @@ public class GeWidgets
 	private static final int BACK_ARROW_HOVER_OPACITY = 100;
 
 	private final WidgetFactory widgets;
+	private final ClientThread clientThread;
 
 	@Inject
-	GeWidgets(WidgetFactory widgets)
+	GeWidgets(WidgetFactory widgets, ClientThread clientThread)
 	{
 		this.widgets = widgets;
+		this.clientThread = clientThread;
 	}
 
 	/**
@@ -112,7 +115,7 @@ public class GeWidgets
 	{
 		Widget close = widgets.sprite(parent, SpriteID.CloseButtons.BUTTON,
 			frameWidth - CLOSE_BUTTON_RIGHT, CLOSE_BUTTON_TOP, CLOSE_BUTTON_WIDTH, CLOSE_BUTTON_HEIGHT);
-		makeClickable(close, null, "Close", onClick);
+		makeClickable(close, null, "Close", afterClick(onClick));
 		close.setOnMouseOverListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.HOVERED));
 		close.setOnMouseLeaveListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.BUTTON));
 		return close;
@@ -123,7 +126,7 @@ public class GeWidgets
 	{
 		Widget arrow = widgets.sprite(parent, SpriteID.GE_BACKBUTTON,
 			BACK_ARROW_LEFT, frameHeight - BACK_ARROW_BOTTOM, BACK_ARROW_WIDTH, BACK_ARROW_HEIGHT);
-		makeClickable(arrow, null, "Back", onClick);
+		makeClickable(arrow, null, "Back", afterClick(onClick));
 		arrow.setOnMouseOverListener((JavaScriptCallback) e -> arrow.setOpacity(BACK_ARROW_HOVER_OPACITY));
 		arrow.setOnMouseLeaveListener((JavaScriptCallback) e -> arrow.setOpacity(0));
 		return arrow;
@@ -137,6 +140,15 @@ public class GeWidgets
 	{
 		Widget clip = widgets.layer(button, x, y, w, h);
 		return widgets.sprite(clip, SpriteID.GeIcons.BUTTON, spriteX - x, spriteY - y, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
+	}
+
+	/**
+	 * Runs {@code action} on the next client tick. For buttons that remove their own window: removing it while
+	 * the game is still handling the click lets that click fall through to whatever was underneath.
+	 */
+	private Runnable afterClick(Runnable action)
+	{
+		return () -> clientThread.invokeLater(action);
 	}
 
 	private static void setSprite(List<Widget> sprites, int spriteId)
