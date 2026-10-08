@@ -19,6 +19,13 @@ public class AxisTicksTest
 	}
 
 	@Test
+	public void priceTicksUseQuarterStepsWhenTheyFitBetter()
+	{
+		assertEquals(Arrays.asList(1_250.0, 1_500.0, 1_750.0, 2_000.0, 2_250.0, 2_500.0),
+			AxisTicks.prices(1_034, 2_620, 6));
+	}
+
+	@Test
 	public void priceTicksNeverStepBelowOneCoin()
 	{
 		List<Double> ticks = AxisTicks.prices(10, 12, 10);

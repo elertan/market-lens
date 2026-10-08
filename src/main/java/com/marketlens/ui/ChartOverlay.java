@@ -1,6 +1,7 @@
 package com.marketlens.ui;
 
 import com.marketlens.chart.AxisTicks;
+import com.marketlens.chart.LabelLayout;
 import com.marketlens.chart.PriceFormat;
 import com.marketlens.price.LatestPrice;
 import com.marketlens.price.PriceService;
@@ -16,6 +17,7 @@ import java.awt.RenderingHints;
 import java.awt.Stroke;
 import java.awt.geom.Path2D;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 import javax.inject.Inject;
@@ -41,7 +43,7 @@ public class ChartOverlay extends Overlay
 	private static final int PANE_GAP = 4;
 	private static final double VOLUME_FRACTION = 0.2;
 	private static final double PRICE_PADDING = 0.08;
-	private static final int MIN_PX_PER_PRICE_TICK = 32;
+	private static final int MIN_PX_PER_PRICE_TICK = 24;
 	private static final int MIN_PX_PER_TIME_TICK = 64;
 	private static final int MIN_PX_PER_DOT = 5;
 	private static final int DOT_SIZE = 3;
@@ -203,7 +205,9 @@ public class ChartOverlay extends Overlay
 		void draw()
 		{
 			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-			drawPriceGrid();
+			List<Tag> tags = layoutTags();
+			drawPriceGrid(tags);
+			drawVolumeScale();
 			drawTimeGrid();
 
 			Shape clip = g.getClip();
@@ -213,7 +217,7 @@ public class ChartOverlay extends Overlay
 			drawLine(TimeseriesPoint::getAvgLowPrice, Palette.SELL_COLOR);
 			g.setClip(clip);
 
-			drawLastPriceTags();
+			drawTags(tags);
 			TimeseriesPoint hovered = drawCrosshair();
 			drawLegend(hovered != null ? hovered : points.get(last));
 		}
@@ -238,8 +242,8 @@ public class ChartOverlay extends Overlay
 			return start + (double) (x - plot.x) / plot.width * (end - start);
 		}
 
-		/** Horizontal grid + right axis labels. */
-		private void drawPriceGrid()
+		/** Horizontal grid + right axis labels, leaving out labels that a price tag would cover. */
+		private void drawPriceGrid(List<Tag> tags)
 		{
 			List<Double> ticks = AxisTicks.prices(min, max, Math.max(2, pricePane.height / MIN_PX_PER_PRICE_TICK));
 			double step = ticks.size() > 1 ? ticks.get(1) - ticks.get(0) : 1;
@@ -250,8 +254,20 @@ public class ChartOverlay extends Overlay
 				int y = y(tick);
 				g.setColor(Palette.GRID);
 				g.drawLine(plot.x, y, plot.x + plot.width, y);
-				drawText(g, PriceFormat.axis(tick, step), labelX, y + ascent / 2 - 1, Palette.AXIS_TEXT);
+				if (tags.stream().noneMatch(tag -> Math.abs(tag.labelY - y) < labelHeight()))
+				{
+					drawText(g, PriceFormat.axis(tick, step), labelX, y + ascent / 2 - 1, Palette.AXIS_TEXT);
+				}
 			}
+		}
+
+		/** Top of the volume pane: a grid line and the largest visible volume, so the bars have a scale. */
+		private void drawVolumeScale()
+		{
+			g.setColor(Palette.GRID);
+			g.drawLine(plot.x, volumePane.y, plot.x + plot.width, volumePane.y);
+			int ascent = g.getFontMetrics().getAscent();
+			drawText(g, PriceFormat.compact(maxVolume), plot.x + plot.width + 4, volumePane.y + ascent, Palette.AXIS_TEXT);
 		}
 
 		/** Vertical grid + bottom axis labels. */
@@ -348,29 +364,52 @@ public class ChartOverlay extends Overlay
 			g.draw(path);
 		}
 
-		/** Live /latest prices as dashed lines with coloured tags on the price axis. */
-		private void drawLastPriceTags()
+		/** Live /latest prices as tags on the price axis, moved apart where they would overlap. */
+		private List<Tag> layoutTags()
 		{
+			List<Tag> tags = new ArrayList<>();
 			LatestPrice latest = prices.getLatest(state.getItemId());
-			if (latest == null)
+			if (latest != null)
 			{
-				return;
+				addTag(tags, latest.getHigh(), Palette.BUY_COLOR);
+				addTag(tags, latest.getLow(), Palette.SELL_COLOR);
 			}
-			drawPriceTag(latest.getHigh(), Palette.BUY_COLOR);
-			drawPriceTag(latest.getLow(), Palette.SELL_COLOR);
+
+			int[] lineYs = tags.stream().mapToInt(tag -> tag.lineY).toArray();
+			int[] labelYs = LabelLayout.separate(lineYs, labelHeight(), pricePane.y, pricePane.y + pricePane.height);
+			for (int i = 0; i < tags.size(); i++)
+			{
+				tags.get(i).labelY = labelYs[i];
+			}
+			return tags;
 		}
 
-		private void drawPriceTag(Long price, Color color)
+		private void addTag(List<Tag> tags, Long price, Color color)
 		{
-			if (price == null || price < min || price > max)
+			if (price != null && price >= min && price <= max)
 			{
-				return;
+				tags.add(new Tag(price, color, y(price)));
 			}
-			int y = y(price);
+		}
+
+		/** Dashed line at the exact price, coloured label at its (possibly moved) position on the axis. */
+		private void drawTags(List<Tag> tags)
+		{
 			g.setStroke(DASHED);
-			g.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 140));
-			g.drawLine(plot.x, y, plot.x + plot.width, y);
-			drawAxisBox(PriceFormat.axis(price, 1), plot.x + plot.width + 1, y, color, Color.BLACK);
+			for (Tag tag : tags)
+			{
+				g.setColor(new Color(tag.color.getRed(), tag.color.getGreen(), tag.color.getBlue(), 140));
+				g.drawLine(plot.x, tag.lineY, plot.x + plot.width, tag.lineY);
+			}
+			for (Tag tag : tags)
+			{
+				drawAxisBox(PriceFormat.axis(tag.price, 1), plot.x + plot.width + 1, tag.labelY, tag.color, Color.BLACK);
+			}
+		}
+
+		private int labelHeight()
+		{
+			return g.getFontMetrics().getAscent() + 4;
 		}
 
 		/** Crosshair snapped to the nearest bucket. Returns that bucket, or null when not hovering. */
@@ -423,7 +462,7 @@ public class ChartOverlay extends Overlay
 		private void drawAxisBox(String text, int x, int centerY, Color background, Color foreground)
 		{
 			FontMetrics fm = g.getFontMetrics();
-			int h = fm.getAscent() + 4;
+			int h = labelHeight();
 			g.setColor(background);
 			g.fillRect(x, centerY - h / 2, PRICE_AXIS_WIDTH - 2, h);
 			g.setColor(foreground);
@@ -450,6 +489,22 @@ public class ChartOverlay extends Overlay
 			String text = value == null ? "-" : PriceFormat.exact(Math.round(value));
 			drawText(g, text, x, y, color);
 			return x + fm.stringWidth(text) + 10;
+		}
+	}
+
+	/** A live-price tag: its dashed line sits at the exact price, its label may be moved to avoid overlap. */
+	private static final class Tag
+	{
+		private final long price;
+		private final Color color;
+		private final int lineY;
+		private int labelY;
+
+		Tag(long price, Color color, int lineY)
+		{
+			this.price = price;
+			this.color = color;
+			this.lineY = lineY;
 		}
 	}
 }

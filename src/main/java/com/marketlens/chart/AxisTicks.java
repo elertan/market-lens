@@ -30,7 +30,7 @@ public final class AxisTicks
 	{
 	}
 
-	/** Round price levels (1, 2 or 5 x 10^n, at least 1gp apart) inside [min, max]. */
+	/** Round price levels (1, 2, 2.5 or 5 x 10^n, at least 1gp apart) inside [min, max]. */
 	public static List<Double> prices(double min, double max, int targetCount)
 	{
 		List<Double> ticks = new ArrayList<>();
@@ -42,7 +42,12 @@ public final class AxisTicks
 		double raw = (max - min) / targetCount;
 		double magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
 		double norm = raw / magnitude;
-		double nice = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+		double nice = norm < 1.5 ? 1 : norm < 2.25 ? 2 : norm < 3.5 ? 2.5 : norm < 7 ? 5 : 10;
+		if (nice == 2.5 && magnitude < 10)
+		{
+			// 2.5gp steps would give fractional coin labels
+			nice = 2;
+		}
 		double step = Math.max(1, nice * magnitude);
 
 		double first = Math.ceil(min / step) * step;
