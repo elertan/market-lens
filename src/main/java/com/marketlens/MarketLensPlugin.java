@@ -5,6 +5,7 @@ import com.marketlens.ge.GeButtonInjector;
 import com.marketlens.price.PriceService;
 import com.marketlens.ui.ChartInput;
 import com.marketlens.ui.ChartOverlay;
+import com.marketlens.ui.MarketLensSprite;
 import com.marketlens.ui.PriceWindow;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
@@ -52,10 +54,13 @@ public class MarketLensPlugin extends Plugin
 	private ChartOverlay chartOverlay;
 	@Inject
 	private ChartInput chartInput;
+	@Inject
+	private SpriteManager spriteManager;
 
 	@Override
 	protected void startUp()
 	{
+		spriteManager.addSpriteOverrides(MarketLensSprite.values());
 		buttonInjector.setOnClick(itemId -> window.open(itemId, config.defaultTimeframe()));
 		// Start loading the chart as soon as an item is picked, so it is ready by the time the button is clicked.
 		buttonInjector.setOnItemShown(itemId -> priceService.getSeries(itemId, config.defaultTimeframe()));
@@ -80,6 +85,7 @@ public class MarketLensPlugin extends Plugin
 			buttonInjector.reset();
 			window.close();
 		});
+		spriteManager.removeSpriteOverrides(MarketLensSprite.values());
 	}
 
 	@Subscribe

@@ -1,7 +1,5 @@
 package com.marketlens.ui;
 
-import java.util.ArrayList;
-import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.FontID;
@@ -28,10 +26,7 @@ public class GeWidgets
 	private static final int EDGE_OVERHANG = 15;
 
 	/** The small GE buttons (+1, +10, -5%...) are one 35x35 sprite. */
-	private static final int SMALL_BUTTON_SIZE = 35;
-	public static final int SMALL_BUTTON_HEIGHT = SMALL_BUTTON_SIZE;
-	/** Width of the bevelled edge kept intact when a small button is widened. */
-	private static final int SMALL_BUTTON_CAP = 8;
+	public static final int SMALL_BUTTON_SIZE = 35;
 
 	private static final int BACK_ARROW_WIDTH = 30;
 	private static final int BACK_ARROW_HEIGHT = 23;
@@ -82,28 +77,19 @@ public class GeWidgets
 	}
 
 	/**
-	 * A small GE button (like +10 or -5%) of any width. The 35x35 button sprite is never stretched:
-	 * clipping layers show its left and right bevels, and repeat its centre columns in between.
+	 * An icon-only small GE button, like the guide-price button: the 35x35 GE button sprite
+	 * with {@code icon} centred on it. Hovering shows the GE's hover sprite and the menu shows "action name".
 	 */
-	public Widget smallButton(Widget parent, String label, String action, int x, int y, int w, Runnable onClick)
+	public Widget iconButton(Widget parent, MarketLensSprite icon, String name, String action, int x, int y, Runnable onClick)
 	{
-		int h = SMALL_BUTTON_SIZE;
-		Widget button = widgets.layer(parent, x, y, w, h);
+		Widget button = widgets.layer(parent, x, y, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
+		Widget background = widgets.sprite(button, SpriteID.GeIcons.BUTTON, 0, 0, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
+		widgets.sprite(button, icon.getSpriteId(), (SMALL_BUTTON_SIZE - icon.getWidth()) / 2,
+			(SMALL_BUTTON_SIZE - icon.getHeight()) / 2, icon.getWidth(), icon.getHeight());
 
-		List<Widget> sprites = new ArrayList<>();
-		int centre = SMALL_BUTTON_SIZE - 2 * SMALL_BUTTON_CAP;
-		sprites.add(croppedButtonSprite(button, 0, SMALL_BUTTON_CAP, 0));
-		for (int sx = SMALL_BUTTON_CAP; sx < w - SMALL_BUTTON_CAP; sx += centre)
-		{
-			sprites.add(croppedButtonSprite(button, sx, Math.min(centre, w - SMALL_BUTTON_CAP - sx), SMALL_BUTTON_CAP));
-		}
-		sprites.add(croppedButtonSprite(button, w - SMALL_BUTTON_CAP, SMALL_BUTTON_CAP, SMALL_BUTTON_SIZE - SMALL_BUTTON_CAP));
-
-		widgets.text(button, label, FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.CENTER, 0, 0, w, h);
-
-		makeClickable(button, label, action, onClick);
-		button.setOnMouseOverListener((JavaScriptCallback) e -> setSprite(sprites, SpriteID.GeIcons.BUTTON_HOVERED));
-		button.setOnMouseLeaveListener((JavaScriptCallback) e -> setSprite(sprites, SpriteID.GeIcons.BUTTON));
+		makeClickable(button, name, action, onClick);
+		button.setOnMouseOverListener((JavaScriptCallback) e -> background.setSpriteId(SpriteID.GeIcons.BUTTON_HOVERED));
+		button.setOnMouseLeaveListener((JavaScriptCallback) e -> background.setSpriteId(SpriteID.GeIcons.BUTTON));
 		return button;
 	}
 
@@ -126,13 +112,6 @@ public class GeWidgets
 		return item;
 	}
 
-	/** One slice of the small button: a clipping layer at {@code x} showing sprite columns from {@code offset}. */
-	private Widget croppedButtonSprite(Widget button, int x, int width, int offset)
-	{
-		Widget clip = widgets.layer(button, x, 0, width, SMALL_BUTTON_SIZE);
-		return widgets.sprite(clip, SpriteID.GeIcons.BUTTON, -offset, 0, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
-	}
-
 	private static void makeClickable(Widget widget, String name, String action, Runnable onClick)
 	{
 		if (name != null)
@@ -142,13 +121,5 @@ public class GeWidgets
 		widget.setAction(0, action);
 		widget.setHasListener(true);
 		widget.setOnOpListener((JavaScriptCallback) e -> onClick.run());
-	}
-
-	private static void setSprite(List<Widget> sprites, int spriteId)
-	{
-		for (Widget sprite : sprites)
-		{
-			sprite.setSpriteId(spriteId);
-		}
 	}
 }

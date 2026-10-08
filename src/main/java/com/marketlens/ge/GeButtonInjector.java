@@ -1,6 +1,7 @@
 package com.marketlens.ge;
 
 import com.marketlens.ui.GeWidgets;
+import com.marketlens.ui.MarketLensSprite;
 import java.awt.Rectangle;
 import java.util.function.IntConsumer;
 import javax.inject.Inject;
@@ -14,8 +15,8 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.ItemManager;
 
 /**
- * Keeps a "Market Lens" button on the GE offer setup screen, right of the Confirm button,
- * mirrored to the back arrow on the left, in the style of the small GE buttons (+10, -5%...).
+ * Keeps a Market Lens button on the GE offer setup screen, right of the Confirm button,
+ * mirrored to the back arrow on the left: an icon-only small GE button with a price-chart icon.
  * The game rebuilds the setup widgets often, so {@link #update()} re-adds the button whenever it disappears.
  * Client thread only.
  */
@@ -23,8 +24,7 @@ import net.runelite.client.game.ItemManager;
 @Singleton
 public class GeButtonInjector
 {
-	private static final String LABEL = "Market Lens";
-	private static final int BUTTON_WIDTH = 80;
+	private static final String NAME = "Market Lens";
 	private static final int MIN_GAP = 6;
 
 	private final Client client;
@@ -107,15 +107,16 @@ public class GeButtonInjector
 		Widget back = client.getWidget(InterfaceID.GeOffers.BACK);
 		int right = back != null && !back.isHidden()
 			? 2 * confirmCenterX - back.getBounds().x
-			: c.x + c.width + BUTTON_WIDTH + MIN_GAP;
-		int left = Math.max(right - BUTTON_WIDTH, c.x + c.width + MIN_GAP);
+			: c.x + c.width + GeWidgets.SMALL_BUTTON_SIZE + MIN_GAP;
+		int left = Math.max(right - GeWidgets.SMALL_BUTTON_SIZE, c.x + c.width + MIN_GAP);
 
 		Point origin = parent.getCanvasLocation();
 		int x = left - origin.getX();
-		int y = c.y + (c.height - GeWidgets.SMALL_BUTTON_HEIGHT) / 2 - origin.getY();
+		int y = c.y + (c.height - GeWidgets.SMALL_BUTTON_SIZE) / 2 - origin.getY();
 
 		log.debug("Adding Market Lens button at {},{}", x, y);
-		return geWidgets.smallButton(parent, LABEL, "View prices", x, y, right - left, () -> onClick.accept(currentItem()));
+		return geWidgets.iconButton(parent, MarketLensSprite.CHART_ICON, NAME, "View prices", x, y,
+			() -> onClick.accept(currentItem()));
 	}
 
 	private int currentItem()
