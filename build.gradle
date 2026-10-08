@@ -39,6 +39,8 @@ tasks.register('run', JavaExec) {
 	mainClass = pluginMainClass
 
 	jvmArgs "-ea"
+	// Needed on macOS with Java 17+: RuneLite's full-screen adapter extends com.apple.eawt classes.
+	jvmArgs "--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED"
 	args "--developer-mode", "--debug"
 }
 
