@@ -24,7 +24,9 @@ abstract class ChartOverlay extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		Rectangle area = chartBounds();
-		if (area != null)
+		// Widgets the client hasn't drawn yet report position -1,-1; drawing then would flash the chart in the
+		// top-left corner for a frame. A real chart area lies inside its window, so never at negative coordinates.
+		if (area != null && area.x >= 0 && area.y >= 0)
 		{
 			renderer.render(graphics, area);
 		}
