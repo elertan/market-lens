@@ -41,7 +41,7 @@ public class PriceWindow implements KeyListener
 	/** Vertical centre of the title text in the frame's title bar. */
 	private static final int TITLE_CENTER_Y = 18;
 	private static final int ICON_GAP = 4;
-	/** Left inset of the muted "Market Lens" text in the title bar, where the GE shows its History button. */
+	/** Left inset of the icon and muted "Market Lens" text in the title bar, where the GE shows its History button. */
 	private static final int BRAND_LEFT = 12;
 	private static final int PAD = 10;
 	private static final int SUMMARY_WIDTH = 150;
@@ -243,7 +243,11 @@ public class PriceWindow implements KeyListener
 		title = geWidgets.frame(root, w, h);
 		itemIcon = widgets.sprite(root, SmallItemSprite.SPRITE_ID, 0, TITLE_CENTER_Y - SmallItemSprite.HEIGHT / 2,
 			SmallItemSprite.WIDTH, SmallItemSprite.HEIGHT);
-		widgets.text(root, "Market Lens", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, BRAND_LEFT, 6, 120, 24);
+		MarketLensSprite brandIcon = MarketLensSprite.CHART_ICON_SMALL;
+		widgets.sprite(root, brandIcon.getSpriteId(), BRAND_LEFT, TITLE_CENTER_Y - brandIcon.getHeight() / 2,
+			brandIcon.getWidth(), brandIcon.getHeight());
+		widgets.text(root, "Market Lens", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT,
+			BRAND_LEFT + brandIcon.getWidth() + ICON_GAP, 6, 120, 24);
 		geWidgets.backArrow(root, h, this::close);
 		buildSummary(h);
 		buildTabs(w);

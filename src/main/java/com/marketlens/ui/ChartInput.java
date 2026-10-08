@@ -9,9 +9,9 @@ import net.runelite.client.input.MouseListener;
 import net.runelite.client.input.MouseWheelListener;
 
 /**
- * Chart mouse handling on the AWT thread: hover for the crosshair, wheel to zoom around the cursor,
- * left-drag to pan, double-click to reset. Events inside the plot are consumed so the game camera
- * does not zoom or walk.
+ * Chart mouse handling on the AWT thread: hover for the crosshair, wheel to zoom (anchored on the right
+ * edge, or on the cursor with Shift/Ctrl), left-drag to pan, double-click to reset. Events inside the plot
+ * are consumed so the game camera does not zoom or walk.
  */
 @Singleton
 public class ChartInput implements MouseListener, MouseWheelListener
@@ -35,8 +35,10 @@ public class ChartInput implements MouseListener, MouseWheelListener
 		{
 			return e;
 		}
-		// Wheel down (positive rotation) zooms out, like TradingView.
-		state.getViewport().zoom(Math.pow(ZOOM_STEP, e.getPreciseWheelRotation()), timeAt(plot, e.getX()));
+		// Like TradingView: the wheel zooms around the newest visible data (only the left edge moves);
+		// with Shift or Ctrl held it zooms around the cursor. Wheel down (positive rotation) zooms out.
+		double anchor = e.isShiftDown() || e.isControlDown() ? timeAt(plot, e.getX()) : state.getViewport().getEnd();
+		state.getViewport().zoom(Math.pow(ZOOM_STEP, e.getPreciseWheelRotation()), anchor);
 		e.consume();
 		return e;
 	}

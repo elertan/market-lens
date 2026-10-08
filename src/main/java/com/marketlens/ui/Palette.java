@@ -10,15 +10,16 @@ public final class Palette
 	public static final int WHITE = 0xFFFFFF;
 	public static final int YELLOW = 0xFFFF00;
 	public static final int MUTED = 0x9F9F9F;
-	public static final int BUY = 0x1ED61E;
-	public static final int SELL = 0xF04040;
+	/** Average of the green and red shades in the Market Lens icon. */
+	public static final int BUY = 0x63B936;
+	public static final int SELL = 0xD05A3D;
 	public static final int DIVIDER = 0x5A5245;
 	public static final int CHART_BACKGROUND = 0x000000;
 
 	public static final Color BUY_COLOR = new Color(BUY);
 	public static final Color SELL_COLOR = new Color(SELL);
-	public static final Color BUY_VOLUME = new Color(0x1E, 0xD6, 0x1E, 110);
-	public static final Color SELL_VOLUME = new Color(0xF0, 0x40, 0x40, 110);
+	public static final Color BUY_VOLUME = new Color(0x63, 0xB9, 0x36, 110);
+	public static final Color SELL_VOLUME = new Color(0xD0, 0x5A, 0x3D, 110);
 	public static final Color GRID = new Color(255, 255, 255, 22);
 	public static final Color AXIS_TEXT = new Color(0xC8B48C);
 	public static final Color CROSSHAIR = new Color(255, 255, 255, 120);
