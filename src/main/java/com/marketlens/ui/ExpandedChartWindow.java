@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 
 /**
@@ -98,7 +99,7 @@ public class ExpandedChartWindow
 
 	private void build()
 	{
-		parent = canvasRoot();
+		parent = topLayer();
 		if (parent == null)
 		{
 			open = false;
@@ -136,33 +137,35 @@ public class ExpandedChartWindow
 	private boolean isAttached()
 	{
 		return root != null
-			&& parent == canvasRoot()
+			&& parent == topLayer()
 			&& parent.getChild(root.getIndex()) == root
 			&& parent.getWidth() == builtWidth
 			&& parent.getHeight() == builtHeight;
 	}
 
-	/** The top-level interface's largest root widget, which spans the game canvas. */
-	private Widget canvasRoot()
+	/**
+	 * The top-level interface's UI highlights layer. It spans the whole canvas and is drawn after everything
+	 * else, so the window covers the game view, chat box and side panels, and blocks mouse input to them.
+	 * Every client layout (fixed, resizable classic/modern, ...) has one.
+	 */
+	private Widget topLayer()
 	{
-		Widget best = null;
-		Widget[] roots = client.getWidgetRoots();
-		if (roots != null)
+		switch (client.getTopLevelInterfaceId())
 		{
-			for (Widget candidate : roots)
-			{
-				if (candidate != null && !candidate.isHidden()
-					&& (best == null || area(candidate) > area(best)))
-				{
-					best = candidate;
-				}
-			}
+			case InterfaceID.TOPLEVEL:
+				return client.getWidget(InterfaceID.Toplevel.UI_HIGHLIGHTS);
+			case InterfaceID.TOPLEVEL_OSRS_STRETCH:
+				return client.getWidget(InterfaceID.ToplevelOsrsStretch.UI_HIGHLIGHTS);
+			case InterfaceID.TOPLEVEL_PRE_EOC:
+				return client.getWidget(InterfaceID.ToplevelPreEoc.UI_HIGHLIGHTS);
+			case InterfaceID.TOPLEVEL_OSM:
+				return client.getWidget(InterfaceID.ToplevelOsm.UI_HIGHLIGHTS);
+			case InterfaceID.TOPLEVEL_DISPLAY:
+				return client.getWidget(InterfaceID.ToplevelDisplay.UI_HIGHLIGHTS);
+			case InterfaceID.TOPLEVEL_SPECTATOR:
+				return client.getWidget(InterfaceID.ToplevelSpectator.UI_HIGHLIGHTS);
+			default:
+				return null;
 		}
-		return best;
-	}
-
-	private static long area(Widget widget)
-	{
-		return (long) widget.getWidth() * widget.getHeight();
 	}
 }

@@ -31,12 +31,15 @@ public class PriceWindow implements KeyListener
 {
 	/** Content starts below the frame's title divider. */
 	private static final int CONTENT_TOP = 40;
-	private static final int CHART_TOP = CONTENT_TOP + 20;
+	/** Row above the chart with the timeframe tabs and the expand button, which is taller than the tabs. */
+	private static final int TAB_ROW_HEIGHT = 30;
 	private static final int TABS_TO_CHART = 4;
+	private static final int CHART_TOP = CONTENT_TOP + TAB_ROW_HEIGHT;
 	private static final int PAD = 10;
 	private static final int SUMMARY_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
-	private static final int EXPAND_BUTTON_WIDTH = 24;
+	private static final int EXPAND_BUTTON_WIDTH = 26;
+	private static final int EXPAND_BUTTON_HEIGHT = 30;
 
 	private final Client client;
 	private final ClientThread clientThread;
@@ -239,11 +242,12 @@ public class PriceWindow implements KeyListener
 
 		int chartX = PAD + SUMMARY_WIDTH + PAD;
 		int chartY = CHART_TOP;
-		int rowHeight = TimeframeTabs.height(widgets);
-		int rowY = CHART_TOP - rowHeight - TABS_TO_CHART;
-		tabs = new TimeframeTabs(widgets, root, chartX, rowY, state.getTimeframe(), this::selectTimeframe);
+		int rowY = CHART_TOP - TAB_ROW_HEIGHT - TABS_TO_CHART;
+		int tabsY = rowY + (TAB_ROW_HEIGHT - TimeframeTabs.height(widgets)) / 2;
+		tabs = new TimeframeTabs(widgets, root, chartX, tabsY, state.getTimeframe(), this::selectTimeframe);
 		geWidgets.iconButton(root, MarketLensSprite.EXPAND_ICON, "Market Lens", "Expand",
-			w - PAD - EXPAND_BUTTON_WIDTH, rowY, EXPAND_BUTTON_WIDTH, rowHeight, this::expand);
+			w - PAD - EXPAND_BUTTON_WIDTH, rowY + (TAB_ROW_HEIGHT - EXPAND_BUTTON_HEIGHT) / 2,
+			EXPAND_BUTTON_WIDTH, EXPAND_BUTTON_HEIGHT, this::expand);
 
 		chartArea = widgets.rect(root, Palette.CHART_BACKGROUND, 120, true, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
 		widgets.rect(root, Palette.DIVIDER, 0, false, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
