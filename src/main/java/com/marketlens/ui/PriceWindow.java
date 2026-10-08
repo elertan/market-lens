@@ -22,21 +22,21 @@ import net.runelite.api.gameval.SpriteID;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetTextAlignment;
-import net.runelite.api.widgets.WidgetType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.input.KeyListener;
 
 /**
  * The Market Lens window, built from native game widgets on top of the GE interface:
- * steel border frame, title, close button, price summary and timeframe buttons.
+ * GE frame, title, back arrow, price summary and timeframe buttons.
  * The chart itself is drawn by {@link ChartOverlay} inside {@link #getChartBounds()}.
  * Client thread only, except {@link #keyPressed}.
  */
 @Singleton
 public class PriceWindow implements KeyListener
 {
-	private static final int MAX_WIDTH = 488;
-	private static final int MAX_HEIGHT = 300;
+	/** Content starts below the frame's title divider. */
+	private static final int CONTENT_TOP = 40;
+	private static final int CHART_TOP = CONTENT_TOP + 20;
 	private static final int PAD = 10;
 	private static final int SUMMARY_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
@@ -48,6 +48,7 @@ public class PriceWindow implements KeyListener
 	private final PriceService prices;
 	private final ChartState state;
 	private final WidgetFactory widgets;
+	private final GeWidgets geWidgets;
 
 	private Widget root;
 	private Widget chartArea;
@@ -64,13 +65,15 @@ public class PriceWindow implements KeyListener
 	private final Map<Timeframe, Widget> tabLabels = new EnumMap<>(Timeframe.class);
 
 	@Inject
-	PriceWindow(Client client, ClientThread clientThread, PriceService prices, ChartState state, WidgetFactory widgets)
+	PriceWindow(Client client, ClientThread clientThread, PriceService prices, ChartState state, WidgetFactory widgets,
+		GeWidgets geWidgets)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
 		this.prices = prices;
 		this.state = state;
 		this.widgets = widgets;
+		this.geWidgets = geWidgets;
 	}
 
 	public void open(int itemId, Timeframe timeframe)
@@ -206,70 +209,24 @@ public class PriceWindow implements KeyListener
 		Widget frame = client.getWidget(InterfaceID.GeOffers.FRAME);
 		Rectangle host = frame != null ? frame.getBounds() : universe.getBounds();
 		Point origin = universe.getCanvasLocation();
-		int w = Math.min(MAX_WIDTH, host.width);
-		int h = Math.min(MAX_HEIGHT, host.height);
+		int w = Math.min(GeWidgets.FRAME_WIDTH, host.width);
+		int h = Math.min(GeWidgets.FRAME_HEIGHT, host.height);
 		int x = host.x - origin.getX() + (host.width - w) / 2;
 		int y = host.y - origin.getY() + (host.height - h) / 2;
 
 		root = widgets.layer(universe, x, y, w, h);
-		buildFrame(frame, w, h);
+		// Swallow clicks and scrolls so nothing reaches the GE underneath.
+		root.setNoClickThrough(true);
+		root.setNoScrollThrough(true);
+		title = geWidgets.frame(root, w, h);
+		geWidgets.backArrow(root, h, this::close);
 		buildSummary(h);
 		buildTabs(w);
 
 		int chartX = PAD + SUMMARY_WIDTH + PAD;
-		int chartY = 52;
+		int chartY = CHART_TOP;
 		chartArea = widgets.rect(root, Palette.CHART_BACKGROUND, 120, true, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
 		widgets.rect(root, Palette.DIVIDER, 0, false, chartX, chartY, w - chartX - PAD, h - chartY - PAD);
-	}
-
-	/**
-	 * Copies the GE's own frame (border, title bar, close button) so the window matches the game exactly.
-	 * Falls back to a plain title and close button if the GE frame cannot be read.
-	 */
-	private void buildFrame(Widget geFrame, int w, int h)
-	{
-		// Background swallows clicks and scrolls so nothing reaches the GE underneath.
-		Widget background = widgets.tiledSprite(root, SpriteID.TRADEBACKING_DARK, 0, 0, w, h);
-		background.setNoClickThrough(true);
-		background.setNoScrollThrough(true);
-
-		title = null;
-		Widget close = null;
-		if (geFrame != null)
-		{
-			for (Widget part : widgets.copyLook(geFrame, root, 0, 0, w, h))
-			{
-				if (title == null && part.getType() == WidgetType.TEXT)
-				{
-					title = part;
-				}
-				else if (close == null && part.getType() == WidgetType.GRAPHIC && part.getSpriteId() == SpriteID.CloseButtons.BUTTON)
-				{
-					close = part;
-				}
-			}
-		}
-
-		if (title == null)
-		{
-			title = widgets.text(root, "", FontID.BOLD_12, Palette.ORANGE, WidgetTextAlignment.CENTER, 0, 6, w, 18);
-		}
-		if (close == null)
-		{
-			Dimension size = widgets.spriteSize(SpriteID.CloseButtons.BUTTON, new Dimension(26, 23));
-			close = widgets.sprite(root, SpriteID.CloseButtons.BUTTON, w - size.width - 6, 6, size.width, size.height);
-		}
-		makeCloseButton(close);
-	}
-
-	private void makeCloseButton(Widget close)
-	{
-		close.setName("<col=ff9040>Market Lens</col>");
-		close.setAction(0, "Close");
-		close.setHasListener(true);
-		close.setOnOpListener((JavaScriptCallback) e -> close());
-		close.setOnMouseOverListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.HOVERED));
-		close.setOnMouseLeaveListener((JavaScriptCallback) e -> close.setSpriteId(SpriteID.CloseButtons.BUTTON));
 	}
 
 	private void buildSummary(int h)
@@ -277,17 +234,17 @@ public class PriceWindow implements KeyListener
 		int x = PAD + 4;
 		int w = SUMMARY_WIDTH - 4;
 
-		widgets.text(root, "Buy price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, 32, w, 14);
-		buyValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.BUY, WidgetTextAlignment.LEFT, x, 46, w, 20);
-		buyAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, 66, w, 14);
+		widgets.text(root, "Buy price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, CONTENT_TOP, w, 14);
+		buyValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.BUY, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 14, w, 20);
+		buyAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 34, w, 14);
 
-		widgets.text(root, "Sell price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, 86, w, 14);
-		sellValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.SELL, WidgetTextAlignment.LEFT, x, 100, w, 20);
-		sellAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, 120, w, 14);
+		widgets.text(root, "Sell price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 54, w, 14);
+		sellValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.SELL, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 68, w, 20);
+		sellAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 88, w, 14);
 
-		widgets.rect(root, Palette.DIVIDER, 0, true, x, 140, w, 1);
+		widgets.rect(root, Palette.DIVIDER, 0, true, x, CONTENT_TOP + 108, w, 1);
 
-		int y = 146;
+		int y = CONTENT_TOP + 114;
 		marginValue = row("Margin", x, y, w);
 		taxValue = row("GE tax", x, y += ROW_HEIGHT, w);
 		profitValue = row("Profit / item", x, y += ROW_HEIGHT, w);
@@ -308,7 +265,7 @@ public class PriceWindow implements KeyListener
 		Dimension leftSize = widgets.spriteSize(SpriteID.GeTextbackdrop.LEFT, new Dimension(5, 18));
 		Dimension rightSize = widgets.spriteSize(SpriteID.GeTextbackdrop.RIGHT, new Dimension(5, 18));
 		int tabHeight = leftSize.height;
-		int y = 52 - tabHeight - 4;
+		int y = CHART_TOP - tabHeight - 4;
 		int x = w - PAD - Timeframe.values().length * (TAB_WIDTH + TAB_GAP) + TAB_GAP;
 
 		for (Timeframe timeframe : Timeframe.values())

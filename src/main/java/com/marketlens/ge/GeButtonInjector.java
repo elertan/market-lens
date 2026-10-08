@@ -1,27 +1,21 @@
 package com.marketlens.ge;
 
-import com.marketlens.ui.WidgetFactory;
+import com.marketlens.ui.GeWidgets;
 import java.awt.Rectangle;
-import java.util.List;
 import java.util.function.IntConsumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.FontID;
 import net.runelite.api.Point;
 import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.gameval.SpriteID;
 import net.runelite.api.gameval.VarPlayerID;
-import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetTextAlignment;
-import net.runelite.api.widgets.WidgetType;
 import net.runelite.client.game.ItemManager;
 
 /**
  * Keeps a "Market Lens" button on the GE offer setup screen, right of the Confirm button,
- * mirrored to the back arrow on the left. It copies the Confirm button's look at a smaller size.
+ * mirrored to the back arrow on the left, in the style of the small GE buttons (+10, -5%...).
  * The game rebuilds the setup widgets often, so {@link #update()} re-adds the button whenever it disappears.
  * Client thread only.
  */
@@ -30,13 +24,12 @@ import net.runelite.client.game.ItemManager;
 public class GeButtonInjector
 {
 	private static final String LABEL = "Market Lens";
-	private static final double WIDTH_SCALE = 0.7;
-	private static final double HEIGHT_SCALE = 0.8;
+	private static final int BUTTON_WIDTH = 80;
 	private static final int MIN_GAP = 6;
 
 	private final Client client;
 	private final ItemManager itemManager;
-	private final WidgetFactory widgets;
+	private final GeWidgets geWidgets;
 
 	private Widget button;
 	private int shownItemId = -1;
@@ -44,11 +37,11 @@ public class GeButtonInjector
 	private IntConsumer onItemShown = id -> {};
 
 	@Inject
-	GeButtonInjector(Client client, ItemManager itemManager, WidgetFactory widgets)
+	GeButtonInjector(Client client, ItemManager itemManager, GeWidgets geWidgets)
 	{
 		this.client = client;
 		this.itemManager = itemManager;
-		this.widgets = widgets;
+		this.geWidgets = geWidgets;
 	}
 
 	public void setOnClick(IntConsumer onClick)
@@ -108,59 +101,21 @@ public class GeButtonInjector
 	private Widget createButton(Widget parent, Widget confirm)
 	{
 		Rectangle c = confirm.getBounds();
-		int confirmRight = c.x + c.width;
 		int confirmCenterX = c.x + c.width / 2;
 
-		// Mirror the back arrow's centre across the Confirm button's centre.
+		// Mirror the back arrow across the Confirm button: the right margin equals the arrow's left margin.
 		Widget back = client.getWidget(InterfaceID.GeOffers.BACK);
-		int centerX = back != null && !back.isHidden()
-			? 2 * confirmCenterX - (back.getBounds().x + back.getBounds().width / 2)
-			: confirmRight + c.width / 2;
+		int right = back != null && !back.isHidden()
+			? 2 * confirmCenterX - back.getBounds().x
+			: c.x + c.width + BUTTON_WIDTH + MIN_GAP;
+		int left = Math.max(right - BUTTON_WIDTH, c.x + c.width + MIN_GAP);
 
-		int w = (int) Math.min(c.width * WIDTH_SCALE, 2 * (centerX - confirmRight - MIN_GAP));
-		int h = (int) (c.height * HEIGHT_SCALE);
 		Point origin = parent.getCanvasLocation();
-		int x = centerX - w / 2 - origin.getX();
-		int y = c.y + (c.height - h) / 2 - origin.getY();
+		int x = left - origin.getX();
+		int y = c.y + (c.height - GeWidgets.SMALL_BUTTON_HEIGHT) / 2 - origin.getY();
 
-		Widget layer = widgets.layer(parent, x, y, w, h);
-		List<Widget> parts = widgets.copyLook(confirm, layer, 0, 0, w, h);
-
-		boolean hasLabel = false;
-		for (Widget part : parts)
-		{
-			if (part.getType() == WidgetType.TEXT)
-			{
-				part.setText(LABEL);
-				part.setFontId(FontID.BOLD_12);
-				hasLabel = true;
-			}
-		}
-		if (!hasLabel)
-		{
-			widgets.text(layer, LABEL, FontID.BOLD_12, 0xFFFFFF, WidgetTextAlignment.CENTER, 0, 0, w, h);
-		}
-
-		layer.setName("<col=ff9040>" + LABEL + "</col>");
-		layer.setAction(0, "View prices");
-		layer.setHasListener(true);
-		layer.setOnOpListener((JavaScriptCallback) e -> onClick.accept(currentItem()));
-		layer.setOnMouseOverListener((JavaScriptCallback) e -> swapSprites(parts, SpriteID.GeIcons.BUTTON, SpriteID.GeIcons.BUTTON_HOVERED));
-		layer.setOnMouseLeaveListener((JavaScriptCallback) e -> swapSprites(parts, SpriteID.GeIcons.BUTTON_HOVERED, SpriteID.GeIcons.BUTTON));
-		log.debug("Added Market Lens button at {},{} ({}x{}), copied {} parts from Confirm", x, y, w, h, parts.size());
-		return layer;
-	}
-
-	/** Hover effect, used when the copied Confirm button is built from the GE button sprite. */
-	private static void swapSprites(List<Widget> parts, int from, int to)
-	{
-		for (Widget part : parts)
-		{
-			if (part.getSpriteId() == from)
-			{
-				part.setSpriteId(to);
-			}
-		}
+		log.debug("Adding Market Lens button at {},{}", x, y);
+		return geWidgets.smallButton(parent, LABEL, "View prices", x, y, right - left, () -> onClick.accept(currentItem()));
 	}
 
 	private int currentItem()
