@@ -20,6 +20,9 @@ public final class Palette
 	public static final Color SELL_COLOR = new Color(SELL);
 	public static final Color BUY_VOLUME = new Color(0x63, 0xB9, 0x36, 110);
 	public static final Color SELL_VOLUME = new Color(0xD0, 0x5A, 0x3D, 110);
+	/** Dashed lines at the live prices: the buy/sell colour, partly transparent. */
+	public static final Color BUY_TAG_LINE = new Color(0x63, 0xB9, 0x36, 140);
+	public static final Color SELL_TAG_LINE = new Color(0xD0, 0x5A, 0x3D, 140);
 	public static final Color GRID = new Color(255, 255, 255, 22);
 	public static final Color AXIS_TEXT = new Color(0xC8B48C);
 	public static final Color CROSSHAIR = new Color(255, 255, 255, 120);

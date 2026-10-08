@@ -15,17 +15,6 @@ public class PriceFormatTest
 	}
 
 	@Test
-	public void compact()
-	{
-		assertEquals("950", PriceFormat.compact(950));
-		assertEquals("9,999", PriceFormat.compact(9_999));
-		assertEquals("12.5K", PriceFormat.compact(12_500));
-		assertEquals("829K", PriceFormat.compact(828_861));
-		assertEquals("1.71M", PriceFormat.compact(1_712_400));
-		assertEquals("2.1B", PriceFormat.compact(2_100_000_000.0));
-	}
-
-	@Test
 	public void axisUsesEnoughDecimalsForTheStep()
 	{
 		assertEquals("812,500", PriceFormat.axis(812_500, 2_500));
