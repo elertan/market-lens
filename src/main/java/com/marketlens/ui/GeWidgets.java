@@ -6,6 +6,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.FontID;
 import net.runelite.api.gameval.SpriteID;
+import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetTextAlignment;
@@ -38,6 +39,13 @@ public class GeWidgets
 	private static final int BACK_ARROW_LEFT = 17;
 	private static final int BACK_ARROW_BOTTOM = 47;
 	private static final int BACK_ARROW_HOVER_OPACITY = 100;
+
+	/** The GE's item slot: a 40x36 box with the 36x32 item graphic inset by 2px. */
+	public static final int ITEM_SLOT_WIDTH = 40;
+	public static final int ITEM_SLOT_HEIGHT = 36;
+	private static final int ITEM_INSET = 2;
+	private static final int ITEM_WIDTH = 36;
+	private static final int ITEM_HEIGHT = 32;
 
 	private final WidgetFactory widgets;
 
@@ -111,6 +119,15 @@ public class GeWidgets
 		arrow.setOnMouseOverListener((JavaScriptCallback) e -> arrow.setOpacity(BACK_ARROW_HOVER_OPACITY));
 		arrow.setOnMouseLeaveListener((JavaScriptCallback) e -> arrow.setOpacity(0));
 		return arrow;
+	}
+
+	/** The GE's item slot box. Returns the item graphic; set the item on it with {@link Widget#setItemId}. */
+	public Widget itemSlot(Widget parent, int x, int y)
+	{
+		widgets.sprite(parent, SpriteID.GeItembackdrop.BOX, x, y, ITEM_SLOT_WIDTH, ITEM_SLOT_HEIGHT);
+		Widget item = widgets.sprite(parent, -1, x + ITEM_INSET, y + ITEM_INSET, ITEM_WIDTH, ITEM_HEIGHT);
+		item.setItemQuantityMode(ItemQuantityMode.NEVER);
+		return item;
 	}
 
 	/** One slice of the small button: a clipping layer at {@code x} showing sprite columns from {@code offset}. */

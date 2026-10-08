@@ -55,6 +55,7 @@ public class PriceWindow implements KeyListener
 	private Widget root;
 	private Widget chartArea;
 	private Widget title;
+	private Widget itemIcon;
 	private Widget buyValue;
 	private Widget buyAge;
 	private Widget sellValue;
@@ -128,6 +129,7 @@ public class PriceWindow implements KeyListener
 		int itemId = state.getItemId();
 		ItemMapping mapping = prices.getMapping(itemId);
 		title.setText(mapping != null ? mapping.getName() : client.getItemDefinition(itemId).getName());
+		itemIcon.setItemId(itemId);
 
 		LatestPrice latest = prices.getLatest(itemId);
 		Long high = latest == null ? null : latest.getHigh();
@@ -244,6 +246,11 @@ public class PriceWindow implements KeyListener
 		widgets.text(root, "Sell price", FontID.PLAIN_11, Palette.ORANGE, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 54, w, 14);
 		sellValue = widgets.text(root, "-", FontID.VERDANA_15, Palette.SELL, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 68, w, 20);
 		sellAge = widgets.text(root, "", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, x, CONTENT_TOP + 88, w, 14);
+
+		// Item slot right-aligned beside the buy/sell prices, vertically centred on them.
+		int pricesHeight = 102;
+		itemIcon = geWidgets.itemSlot(root, x + w - GeWidgets.ITEM_SLOT_WIDTH,
+			CONTENT_TOP + (pricesHeight - GeWidgets.ITEM_SLOT_HEIGHT) / 2);
 
 		widgets.rect(root, Palette.DIVIDER, 0, true, x, CONTENT_TOP + 108, w, 1);
 
