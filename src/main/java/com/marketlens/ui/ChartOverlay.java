@@ -188,6 +188,13 @@ public class ChartOverlay extends Overlay
 				include(p.getAvgLowPrice());
 				maxVolume = Math.max(maxVolume, p.totalVolume());
 			}
+			// When the newest data is in view, fit the live prices too, so their tags never fall off the scale.
+			LatestPrice latest = prices.getLatest(state.getItemId());
+			if (last == points.size() - 1 && latest != null)
+			{
+				include(latest.getHigh() == null ? null : latest.getHigh().doubleValue());
+				include(latest.getLow() == null ? null : latest.getLow().doubleValue());
+			}
 			if (min > max)
 			{
 				min = 0;

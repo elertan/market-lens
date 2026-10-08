@@ -183,7 +183,7 @@ public class PriceWindow implements KeyListener
 		FontTypeFace font = title.getFont();
 		int textWidth = font != null ? font.getTextWidth(title.getText()) : title.getText().length() * 8;
 		int titleCenterX = title.getOriginalX() + title.getOriginalWidth() / 2;
-		smallItemSprite.show(itemId);
+		itemIcon.setSpriteId(smallItemSprite.spriteFor(itemId));
 		itemIcon.setOriginalX(titleCenterX - textWidth / 2 - ICON_GAP - SmallItemSprite.WIDTH);
 		itemIcon.revalidate();
 	}
@@ -241,7 +241,7 @@ public class PriceWindow implements KeyListener
 		root.setNoClickThrough(true);
 		root.setNoScrollThrough(true);
 		title = geWidgets.frame(root, w, h);
-		itemIcon = widgets.sprite(root, SmallItemSprite.SPRITE_ID, 0, TITLE_CENTER_Y - SmallItemSprite.HEIGHT / 2,
+		itemIcon = widgets.sprite(root, -1, 0, TITLE_CENTER_Y - SmallItemSprite.HEIGHT / 2,
 			SmallItemSprite.WIDTH, SmallItemSprite.HEIGHT);
 		MarketLensSprite brandIcon = MarketLensSprite.CHART_ICON_SMALL;
 		widgets.sprite(root, brandIcon.getSpriteId(), BRAND_LEFT, TITLE_CENTER_Y - brandIcon.getHeight() / 2,
