@@ -31,4 +31,15 @@ public interface MarketLensConfig extends Config
 	{
 		return ChartType.LINE;
 	}
+
+	@ConfigItem(
+		keyName = "snapCrosshairToCoins",
+		name = "Snap crosshair to whole coins",
+		description = "The crosshair's price line jumps from one whole coin to the next, as GE prices have no fractions."
+			+ " Most visible on cheap items."
+	)
+	default boolean snapCrosshairToCoins()
+	{
+		return true;
+	}
 }

@@ -1,5 +1,6 @@
 package com.marketlens.ui;
 
+import com.marketlens.MarketLensConfig;
 import com.marketlens.chart.AxisTicks;
 import com.marketlens.chart.Candle;
 import com.marketlens.chart.Candles;
@@ -63,6 +64,7 @@ public class ChartRenderer
 	private final ChartState state;
 	private final PriceService prices;
 	private final GeOffer offer;
+	private final MarketLensConfig config;
 	private final ZoneId zone = ZoneId.systemDefault();
 	/** Pixel bounds of the digits in the chart font; measured once, used to centre labels. */
 	private Rectangle2D digitBounds;
@@ -77,11 +79,12 @@ public class ChartRenderer
 	private List<TimeseriesPoint> candlePoints;
 
 	@Inject
-	ChartRenderer(ChartState state, PriceService prices, GeOffer offer)
+	ChartRenderer(ChartState state, PriceService prices, GeOffer offer, MarketLensConfig config)
 	{
 		this.state = state;
 		this.prices = prices;
 		this.offer = offer;
+		this.config = config;
 	}
 
 	/** Draws the chart for the current item and timeframe into {@code area} (canvas coordinates). */
@@ -437,8 +440,16 @@ public class ChartRenderer
 			g.drawLine(x, plot.y, x, plot.y + plot.height);
 			if (scale.getPricePane().contains(mx, my))
 			{
-				g.drawLine(plot.x, my, plot.x + plot.width, my);
-				text.drawBox(PriceFormat.axis(scale.priceAt(my), 1), plot.x + plot.width + 1, my, PRICE_AXIS_WIDTH - 2,
+				// GE prices are whole coins, so by default the line snaps to the nearest one instead of a fraction.
+				double price = scale.priceAt(my);
+				int y = my;
+				if (config.snapCrosshairToCoins())
+				{
+					price = Math.round(price);
+					y = scale.y(price);
+				}
+				g.drawLine(plot.x, y, plot.x + plot.width, y);
+				text.drawBox(PriceFormat.axis(price, 1), plot.x + plot.width + 1, y, PRICE_AXIS_WIDTH - 2,
 					Palette.LABEL_BACKGROUND, Palette.TEXT);
 			}
 
@@ -453,7 +464,6 @@ public class ChartRenderer
 			return index;
 		}
 
-		/** "High 828,861  Low 808,000  Vol 16" for the hovered or newest bucket. */
 		/**
 		 * Readout for the hovered or newest point: "High 828,861  Low 808,000  Vol 16" for lines,
 		 * "O 137  H 139  L 134  C 136  Vol 16" for candles (close coloured by direction).
