@@ -12,7 +12,8 @@ import net.runelite.api.widgets.Widget;
 /**
  * The expanded chart: the same GE-style frame, title bar and timeframe tabs as the normal window, but sized to
  * cover most of the game canvas and showing only the chart, drawn by {@link ExpandedChartOverlay}.
- * Closed with its close button, or with Esc via {@link PriceWindow}. Client thread only.
+ * Closed with its close button, or with Esc via {@link PriceWindow}. Clicks inside it are taken by
+ * {@link ExpandedWindowInput}, which calls {@link #clickAt}. Client thread only, except {@link #getBounds}.
  */
 @Singleton
 public class ExpandedChartWindow
@@ -35,6 +36,9 @@ public class ExpandedChartWindow
 	private Widget chartArea;
 	private TitleBar titleBar;
 	private TimeframeTabs tabs;
+	private Widget closeButton;
+	/** Canvas bounds of the whole window, read by mouse input on the AWT thread. */
+	private volatile Rectangle bounds;
 	private int builtWidth;
 	private int builtHeight;
 
@@ -64,6 +68,31 @@ public class ExpandedChartWindow
 	{
 		open = false;
 		removeWidgets();
+	}
+
+	/** Canvas bounds of the whole window, or null when it is closed. Safe to call from any thread. */
+	public Rectangle getBounds()
+	{
+		return bounds;
+	}
+
+	/** Performs a left click at canvas point x,y: the close button or a timeframe tab. */
+	public void clickAt(int x, int y)
+	{
+		if (!open || !isAttached())
+		{
+			return;
+		}
+		if (closeButton.getBounds().contains(x, y))
+		{
+			close();
+			return;
+		}
+		Timeframe timeframe = tabs.at(x, y);
+		if (timeframe != null)
+		{
+			onSelectTimeframe.accept(timeframe);
+		}
 	}
 
 	/**
@@ -116,12 +145,13 @@ public class ExpandedChartWindow
 		root.setNoClickThrough(true);
 		root.setNoScrollThrough(true);
 		titleBar = new TitleBar(widgets, root, geWidgets.frame(root, w, h));
-		geWidgets.closeButton(root, w, this::close);
+		closeButton = geWidgets.closeButton(root, w, this::close);
 
 		tabs = new TimeframeTabs(widgets, root, PAD, CONTENT_TOP, state.getTimeframe(), onSelectTimeframe);
 		int chartTop = CONTENT_TOP + TimeframeTabs.height(widgets) + TABS_TO_CHART;
 		chartArea = widgets.rect(root, Palette.CHART_BACKGROUND, 120, true, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
 		widgets.rect(root, Palette.DIVIDER, 0, false, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
+		bounds = root.getBounds();
 	}
 
 	private void removeWidgets()
@@ -132,6 +162,7 @@ public class ExpandedChartWindow
 			root.setHidden(true);
 		}
 		root = null;
+		bounds = null;
 	}
 
 	private boolean isAttached()

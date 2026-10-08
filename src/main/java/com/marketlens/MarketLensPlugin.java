@@ -5,6 +5,7 @@ import com.marketlens.ge.GeButtonInjector;
 import com.marketlens.price.PriceService;
 import com.marketlens.ui.ChartInput;
 import com.marketlens.ui.ExpandedChartOverlay;
+import com.marketlens.ui.ExpandedWindowInput;
 import com.marketlens.ui.GeChartOverlay;
 import com.marketlens.ui.MarketLensSprite;
 import com.marketlens.ui.PriceWindow;
@@ -58,6 +59,8 @@ public class MarketLensPlugin extends Plugin
 	@Inject
 	private ChartInput chartInput;
 	@Inject
+	private ExpandedWindowInput expandedWindowInput;
+	@Inject
 	private SpriteManager spriteManager;
 
 	@Override
@@ -70,7 +73,9 @@ public class MarketLensPlugin extends Plugin
 		priceService.setOnUpdate(() -> clientThread.invokeLater(window::refresh));
 		overlayManager.add(chartOverlay);
 		overlayManager.add(expandedChartOverlay);
+		// Chart first, so drags and clicks on the chart reach it before the window takes the rest.
 		mouseManager.registerMouseListener(chartInput);
+		mouseManager.registerMouseListener(expandedWindowInput);
 		mouseManager.registerMouseWheelListener(chartInput);
 		keyManager.registerKeyListener(window);
 	}
@@ -80,6 +85,7 @@ public class MarketLensPlugin extends Plugin
 	{
 		keyManager.unregisterKeyListener(window);
 		mouseManager.unregisterMouseWheelListener(chartInput);
+		mouseManager.unregisterMouseListener(expandedWindowInput);
 		mouseManager.unregisterMouseListener(chartInput);
 		overlayManager.remove(expandedChartOverlay);
 		overlayManager.remove(chartOverlay);

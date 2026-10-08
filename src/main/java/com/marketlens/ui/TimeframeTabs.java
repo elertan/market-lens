@@ -54,6 +54,19 @@ class TimeframeTabs
 		return widgets.spriteSize(SpriteID.GeTextbackdrop.LEFT, FALLBACK_CAP).height;
 	}
 
+	/** The tab at canvas point x,y, or null. */
+	Timeframe at(int x, int y)
+	{
+		for (Map.Entry<Timeframe, Widget> tab : labels.entrySet())
+		{
+			if (tab.getValue().getBounds().contains(x, y))
+			{
+				return tab.getKey();
+			}
+		}
+		return null;
+	}
+
 	void select(Timeframe timeframe)
 	{
 		selected = timeframe;
