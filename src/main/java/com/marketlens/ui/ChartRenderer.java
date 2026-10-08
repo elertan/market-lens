@@ -2,6 +2,7 @@ package com.marketlens.ui;
 
 import com.marketlens.chart.AxisTicks;
 import com.marketlens.chart.ChartScale;
+import com.marketlens.chart.Downsample;
 import com.marketlens.chart.LabelLayout;
 import com.marketlens.chart.PriceFormat;
 import com.marketlens.price.LatestPrice;
@@ -28,7 +29,8 @@ import net.runelite.client.ui.FontManager;
 /**
  * Draws the price chart into a given area: grid, axes, volume bars, high/low lines, live price tags and a
  * TradingView-style crosshair. Shared by the normal and the expanded chart, so both look the same at any size.
- * The geometry lives in {@link ChartScale}; this class only draws. Client thread only.
+ * The geometry lives in {@link ChartScale}; this class only draws. When buckets would be drawn closer than a few
+ * pixels apart, they are merged first ({@link Downsample}), so dense series stay readable. Client thread only.
  */
 @Singleton
 public class ChartRenderer
@@ -40,6 +42,8 @@ public class ChartRenderer
 	private static final int MIN_PX_PER_PRICE_TICK = 24;
 	private static final int MIN_PX_PER_TIME_TICK = 64;
 	private static final int MIN_PX_PER_DOT = 5;
+	/** Below this spacing, neighbouring buckets are merged so the lines stay readable (see {@link Downsample}). */
+	private static final int MIN_PX_PER_POINT = 3;
 	private static final int DOT_SIZE = 3;
 
 	private static final Stroke LINE = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
@@ -51,6 +55,10 @@ public class ChartRenderer
 	private final ZoneId zone = ZoneId.systemDefault();
 	/** Pixel bounds of the digits in the chart font; measured once, used to centre labels. */
 	private Rectangle2D digitBounds;
+	/** Last merge result, reused until the series or the interval changes. */
+	private List<TimeseriesPoint> mergedSource;
+	private long mergedInterval;
+	private List<TimeseriesPoint> merged;
 
 	@Inject
 	ChartRenderer(ChartState state, PriceService prices)
@@ -87,17 +95,37 @@ public class ChartRenderer
 				return;
 			}
 
+			double start = state.getViewport().getStart();
+			double end = state.getViewport().getEnd();
+			long interval = Downsample.interval(state.getBucketSeconds(), (end - start) / plot.width, MIN_PX_PER_POINT);
+			List<TimeseriesPoint> points = pointsAt(series.getPoints(), interval);
+
 			LatestPrice latest = prices.getLatest(state.getItemId());
-			ChartScale scale = new ChartScale(series.getPoints(), state.getViewport().getStart(),
-				state.getViewport().getEnd(), state.getBucketSeconds(), plot,
+			ChartScale scale = new ChartScale(points, start, end, interval, plot,
 				latest == null || latest.getHigh() == null ? null : latest.getHigh().doubleValue(),
 				latest == null || latest.getLow() == null ? null : latest.getLow().doubleValue());
-			new Frame(g, text, area, scale, series.getPoints(), latest).draw();
+			new Frame(g, text, area, scale, points, interval, latest).draw();
 		}
 		finally
 		{
 			g.dispose();
 		}
+	}
+
+	/** The series at {@code interval}: the raw points, or merged ones when the raw buckets are too dense. */
+	private List<TimeseriesPoint> pointsAt(List<TimeseriesPoint> points, long interval)
+	{
+		if (interval == state.getBucketSeconds())
+		{
+			return points;
+		}
+		if (points != mergedSource || interval != mergedInterval)
+		{
+			merged = Downsample.merge(points, interval);
+			mergedSource = points;
+			mergedInterval = interval;
+		}
+		return merged;
 	}
 
 	private static String statusText(PriceService.Status status)
@@ -122,10 +150,12 @@ public class ChartRenderer
 		private final ChartScale scale;
 		private final Rectangle plot;
 		private final List<TimeseriesPoint> points;
+		/** Seconds per point: the series' bucket size, or the merged interval. */
+		private final long interval;
 		private final LatestPrice latest;
 
 		Frame(Graphics2D g, ChartText text, Rectangle area, ChartScale scale, List<TimeseriesPoint> points,
-			LatestPrice latest)
+			long interval, LatestPrice latest)
 		{
 			this.g = g;
 			this.text = text;
@@ -133,6 +163,7 @@ public class ChartRenderer
 			this.scale = scale;
 			this.plot = scale.getPlot();
 			this.points = points;
+			this.interval = interval;
 			this.latest = latest;
 		}
 
@@ -331,7 +362,7 @@ public class ChartRenderer
 					Palette.LABEL_BACKGROUND, Palette.TEXT);
 			}
 
-			String time = AxisTicks.crosshairLabel(nearest.getTimestamp(), state.getBucketSeconds(), zone);
+			String time = AxisTicks.crosshairLabel(nearest.getTimestamp(), interval, zone);
 			int w = text.width(time) + 8;
 			int boxX = Math.max(area.x, Math.min(x - w / 2, plot.x + plot.width - w));
 			int boxY = plot.y + plot.height + 1;
