@@ -10,8 +10,8 @@ import net.runelite.client.input.MouseWheelListener;
 
 /**
  * Chart mouse handling on the AWT thread: hover for the crosshair, wheel to zoom (anchored on the right
- * edge, or on the cursor with Shift/Ctrl), left-drag to pan, double-click to reset. Events inside the plot
- * are consumed so the game camera does not zoom or walk.
+ * edge, or on the cursor with Shift/Ctrl), left-drag to pan, double-click to reset, and the cross cursor
+ * over the plot. Events inside the plot are consumed so the game camera does not zoom or walk.
  */
 @Singleton
 public class ChartInput implements MouseListener, MouseWheelListener
@@ -19,12 +19,14 @@ public class ChartInput implements MouseListener, MouseWheelListener
 	private static final double ZOOM_STEP = 1.15;
 
 	private final ChartState state;
+	private final ChartCursor cursor;
 	private int dragLastX = -1;
 
 	@Inject
-	ChartInput(ChartState state)
+	ChartInput(ChartState state, ChartCursor cursor)
 	{
 		this.state = state;
+		this.cursor = cursor;
 	}
 
 	@Override
@@ -101,7 +103,8 @@ public class ChartInput implements MouseListener, MouseWheelListener
 	public MouseEvent mouseMoved(MouseEvent e)
 	{
 		Rectangle plot = state.getPlotBounds();
-		if (plot != null && plot.contains(e.getPoint()))
+		boolean overPlot = plot != null && plot.contains(e.getPoint());
+		if (overPlot)
 		{
 			state.setHover(e.getX(), e.getY());
 		}
@@ -109,6 +112,7 @@ public class ChartInput implements MouseListener, MouseWheelListener
 		{
 			state.clearHover();
 		}
+		cursor.update(overPlot);
 		return e;
 	}
 
@@ -122,6 +126,7 @@ public class ChartInput implements MouseListener, MouseWheelListener
 	public MouseEvent mouseExited(MouseEvent e)
 	{
 		state.clearHover();
+		cursor.update(false);
 		return e;
 	}
 

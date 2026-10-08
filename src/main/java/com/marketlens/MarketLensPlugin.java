@@ -3,6 +3,7 @@ package com.marketlens;
 import com.google.inject.Provides;
 import com.marketlens.ge.GeButtonInjector;
 import com.marketlens.price.PriceService;
+import com.marketlens.ui.ChartCursor;
 import com.marketlens.ui.ChartInput;
 import com.marketlens.ui.ExpandedChartOverlay;
 import com.marketlens.ui.ExpandedWindowInput;
@@ -58,6 +59,8 @@ public class MarketLensPlugin extends Plugin
 	@Inject
 	private ExpandedWindowInput expandedWindowInput;
 	@Inject
+	private ChartCursor chartCursor;
+	@Inject
 	private SpriteManager spriteManager;
 
 	@Override
@@ -84,6 +87,7 @@ public class MarketLensPlugin extends Plugin
 		mouseManager.unregisterMouseWheelListener(chartInput);
 		mouseManager.unregisterMouseListener(expandedWindowInput);
 		mouseManager.unregisterMouseListener(chartInput);
+		chartCursor.update(false);
 		overlayManager.remove(expandedChartOverlay);
 		overlayManager.remove(chartOverlay);
 		priceService.setOnUpdate(() -> {});
