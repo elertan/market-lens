@@ -49,6 +49,27 @@ public class ChartViewportTest
 	}
 
 	@Test
+	public void updateRangeFollowsNewestDataAndKeepsZoom()
+	{
+		ChartViewport v = new ChartViewport();
+		v.setData(0, 1000, 10, 200);
+		v.updateRange(100, 1300);
+		assertEquals(1100, v.getStart(), EPS);
+		assertEquals(1300, v.getEnd(), EPS);
+	}
+
+	@Test
+	public void updateRangeLeavesPannedViewInPlace()
+	{
+		ChartViewport v = new ChartViewport();
+		v.setData(0, 1000, 10, 200);
+		v.pan(-300);
+		v.updateRange(100, 1300);
+		assertEquals(500, v.getStart(), EPS);
+		assertEquals(700, v.getEnd(), EPS);
+	}
+
+	@Test
 	public void panStopsAtDataEdges()
 	{
 		ChartViewport v = new ChartViewport();

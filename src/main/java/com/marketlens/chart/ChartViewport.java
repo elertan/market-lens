@@ -28,6 +28,25 @@ public final class ChartViewport
 		reset();
 	}
 
+	/**
+	 * Replaces the data range after a refresh, keeping the user's zoom.
+	 * If the view was showing the newest data it keeps following it.
+	 */
+	public synchronized void updateRange(long dataStart, long dataEnd)
+	{
+		boolean following = end >= this.dataEnd;
+		double span = end - start;
+		this.dataStart = dataStart;
+		this.dataEnd = Math.max(dataEnd, dataStart + 1);
+		span = Math.min(span, this.dataEnd - dataStart);
+		if (following)
+		{
+			end = this.dataEnd;
+			start = end - span;
+		}
+		keepInsideData();
+	}
+
 	public synchronized void reset()
 	{
 		double span = dataEnd - dataStart;

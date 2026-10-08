@@ -44,6 +44,22 @@ public final class PriceFormat
 		return new DecimalFormat("#,##0", SYMBOLS).format(value);
 	}
 
+	/**
+	 * Axis label with just enough decimals to tell ticks {@code step} apart:
+	 * below 1M it is exact ("812,500"), above it is scaled ("1.705M" for a 5K step, "1.71M" for a 10K step).
+	 */
+	public static String axis(double value, double step)
+	{
+		double abs = Math.abs(value);
+		if (abs < 1e6)
+		{
+			return exact(Math.round(value));
+		}
+		double unit = abs >= 1e9 ? 1e9 : 1e6;
+		int decimals = (int) Math.max(0, Math.min(3, Math.ceil(-Math.log10(step / unit))));
+		return String.format(Locale.ENGLISH, "%." + decimals + "f%s", value / unit, unit == 1e9 ? "B" : "M");
+	}
+
 	private static String scaled(double v)
 	{
 		double abs = Math.abs(v);

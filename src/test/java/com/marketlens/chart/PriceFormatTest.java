@@ -26,6 +26,16 @@ public class PriceFormatTest
 	}
 
 	@Test
+	public void axisUsesEnoughDecimalsForTheStep()
+	{
+		assertEquals("812,500", PriceFormat.axis(812_500, 2_500));
+		assertEquals("1.705M", PriceFormat.axis(1_705_000, 5_000));
+		assertEquals("1.71M", PriceFormat.axis(1_710_000, 10_000));
+		assertEquals("2M", PriceFormat.axis(2_000_000, 1_000_000));
+		assertEquals("1.25B", PriceFormat.axis(1_250_000_000, 50_000_000));
+	}
+
+	@Test
 	public void age()
 	{
 		assertEquals("just now", PriceFormat.age(30));
