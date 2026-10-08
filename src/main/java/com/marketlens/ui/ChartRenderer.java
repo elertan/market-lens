@@ -5,6 +5,7 @@ import com.marketlens.chart.ChartScale;
 import com.marketlens.chart.Downsample;
 import com.marketlens.chart.LabelLayout;
 import com.marketlens.chart.PriceFormat;
+import com.marketlens.ge.GeOffer;
 import com.marketlens.price.LatestPrice;
 import com.marketlens.price.PriceService;
 import com.marketlens.price.TimeseriesPoint;
@@ -27,8 +28,8 @@ import javax.inject.Singleton;
 import net.runelite.client.ui.FontManager;
 
 /**
- * Draws the price chart into a given area: grid, axes, volume bars, high/low lines, live price tags and a
- * TradingView-style crosshair. Shared by the normal and the expanded chart, so both look the same at any size.
+ * Draws the price chart into a given area: grid, axes, volume bars, high/low lines, live price tags, the price
+ * chosen on the GE offer screen and a TradingView-style crosshair. Shared by the normal and the expanded chart, so both look the same at any size.
  * The geometry lives in {@link ChartScale}; this class only draws. When buckets would be drawn closer than a few
  * pixels apart, they are merged first ({@link Downsample}), so dense series stay readable. Client thread only.
  */
@@ -52,6 +53,7 @@ public class ChartRenderer
 
 	private final ChartState state;
 	private final PriceService prices;
+	private final GeOffer offer;
 	private final ZoneId zone = ZoneId.systemDefault();
 	/** Pixel bounds of the digits in the chart font; measured once, used to centre labels. */
 	private Rectangle2D digitBounds;
@@ -61,10 +63,11 @@ public class ChartRenderer
 	private List<TimeseriesPoint> merged;
 
 	@Inject
-	ChartRenderer(ChartState state, PriceService prices)
+	ChartRenderer(ChartState state, PriceService prices, GeOffer offer)
 	{
 		this.state = state;
 		this.prices = prices;
+		this.offer = offer;
 	}
 
 	/** Draws the chart for the current item and timeframe into {@code area} (canvas coordinates). */
@@ -101,10 +104,12 @@ public class ChartRenderer
 			List<TimeseriesPoint> points = pointsAt(series.getPoints(), interval);
 
 			LatestPrice latest = prices.getLatest(state.getItemId());
+			Long offerPrice = offer.priceFor(state.getItemId());
 			ChartScale scale = new ChartScale(points, start, end, interval, plot,
 				latest == null || latest.getHigh() == null ? null : latest.getHigh().doubleValue(),
-				latest == null || latest.getLow() == null ? null : latest.getLow().doubleValue());
-			new Frame(g, text, area, scale, points, interval, latest).draw();
+				latest == null || latest.getLow() == null ? null : latest.getLow().doubleValue(),
+				offerPrice == null ? null : offerPrice.doubleValue());
+			new Frame(g, text, area, scale, points, interval, latest, offerPrice).draw();
 		}
 		finally
 		{
@@ -153,9 +158,11 @@ public class ChartRenderer
 		/** Seconds per point: the series' bucket size, or the merged interval. */
 		private final long interval;
 		private final LatestPrice latest;
+		/** Price chosen on the GE offer screen, or null. */
+		private final Long offerPrice;
 
 		Frame(Graphics2D g, ChartText text, Rectangle area, ChartScale scale, List<TimeseriesPoint> points,
-			long interval, LatestPrice latest)
+			long interval, LatestPrice latest, Long offerPrice)
 		{
 			this.g = g;
 			this.text = text;
@@ -165,6 +172,7 @@ public class ChartRenderer
 			this.points = points;
 			this.interval = interval;
 			this.latest = latest;
+			this.offerPrice = offerPrice;
 		}
 
 		void draw()
@@ -296,7 +304,7 @@ public class ChartRenderer
 			g.draw(path);
 		}
 
-		/** Live prices as tags on the price axis, moved apart where they would overlap. */
+		/** Live prices and the chosen offer price as tags on the price axis, moved apart where they would overlap. */
 		private List<Tag> layoutTags()
 		{
 			List<Tag> tags = new ArrayList<>();
@@ -305,6 +313,7 @@ public class ChartRenderer
 				addTag(tags, latest.getHigh(), Palette.BUY_COLOR, Palette.BUY_TAG_LINE);
 				addTag(tags, latest.getLow(), Palette.SELL_COLOR, Palette.SELL_TAG_LINE);
 			}
+			addTag(tags, offerPrice, Palette.OFFER_COLOR, Palette.OFFER_TAG_LINE);
 
 			Rectangle pane = scale.getPricePane();
 			int[] lineYs = tags.stream().mapToInt(tag -> tag.lineY).toArray();

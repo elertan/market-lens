@@ -13,6 +13,8 @@ public final class Palette
 	/** Average of the green and red shades in the Market Lens icon. */
 	public static final int BUY = 0x63B936;
 	public static final int SELL = 0xD05A3D;
+	/** The GE's own colour for the price-per-item field; used for the chosen offer price on the chart. */
+	public static final int OFFER = 0xFFB83F;
 	public static final int DIVIDER = 0x5A5245;
 	public static final int CHART_BACKGROUND = 0x000000;
 
@@ -23,6 +25,8 @@ public final class Palette
 	/** Dashed lines at the live prices: the buy/sell colour, partly transparent. */
 	public static final Color BUY_TAG_LINE = new Color(0x63, 0xB9, 0x36, 140);
 	public static final Color SELL_TAG_LINE = new Color(0xD0, 0x5A, 0x3D, 140);
+	public static final Color OFFER_COLOR = new Color(OFFER);
+	public static final Color OFFER_TAG_LINE = new Color(0xFF, 0xB8, 0x3F, 170);
 	public static final Color GRID = new Color(255, 255, 255, 22);
 	public static final Color AXIS_TEXT = new Color(0xC8B48C);
 	public static final Color CROSSHAIR = new Color(255, 255, 255, 120);

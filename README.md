@@ -8,6 +8,7 @@ When you set up a buy or sell offer, a **Market Lens** button (the price-chart i
 - Margin, GE tax (2%, capped at 5M, exempt items handled) and profit per item
 - Buy limit and 1-hour trade volume
 - A price chart with high/low lines, volume bars, a crosshair and live price tags
+- The price you chose on the GE offer screen, as a line on the chart in the GE's own price colour, so you can see where your offer sits
 - Dense data is merged into larger intervals (15m, 1h, ...) using volume-weighted averages, so the lines stay readable without losing accuracy; zoom in for every single bucket
 - Timeframes: 1H, 6H, 24H, 1W, 1M, 6M, 1Y
 - An expand button that opens the chart over most of the game screen
