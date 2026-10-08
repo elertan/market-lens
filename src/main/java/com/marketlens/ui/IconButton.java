@@ -7,14 +7,11 @@ import net.runelite.api.widgets.Widget;
 
 /**
  * A small GE button with an icon, built by {@link GeWidgets#iconButton}. It brightens on hover and can be
- * marked as selected, for toggles: a selected button keeps the bright look, an unselected toggle dims its icon.
+ * marked as selected, for toggles: a selected button keeps the bright look.
  * Client thread only.
  */
 public final class IconButton
 {
-	/** Icon opacity of an unselected toggle (0 = opaque, 255 = invisible). */
-	private static final int UNSELECTED_ICON_OPACITY = 110;
-
 	@Getter
 	private final Widget widget;
 	private final List<Widget> background;
@@ -32,7 +29,6 @@ public final class IconButton
 	public void setSelected(boolean selected)
 	{
 		this.selected = selected;
-		icon.setOpacity(selected ? 0 : UNSELECTED_ICON_OPACITY);
 		update();
 	}
 
