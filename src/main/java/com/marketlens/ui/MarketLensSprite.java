@@ -19,9 +19,9 @@ public enum MarketLensSprite implements SpriteOverride
 	/** Four outward corners, for the button that expands the chart. */
 	EXPAND_ICON(-5404, "expand_icon.png", 13, 13),
 	/** Chart type toggle: line chart. */
-	LINE_ICON(-5405, "line_icon.png", 13, 13),
+	LINE_ICON(-5405, "line_icon.png", 16, 16),
 	/** Chart type toggle: candlesticks. */
-	CANDLE_ICON(-5406, "candle_icon.png", 13, 13);
+	CANDLE_ICON(-5406, "candle_icon.png", 16, 16);
 
 	private final int spriteId;
 	private final String fileName;

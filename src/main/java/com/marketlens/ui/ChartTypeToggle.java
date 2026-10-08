@@ -6,11 +6,14 @@ import java.util.Map;
 import java.util.function.Consumer;
 import net.runelite.api.widgets.Widget;
 
-/** Two small icon buttons, line and candles, that switch the chart type; the active one is highlighted. */
+/**
+ * Two icon buttons, line and candles, the size of the expand button, that switch the chart type;
+ * the active one is highlighted.
+ */
 class ChartTypeToggle
 {
-	static final int BUTTON_WIDTH = 22;
-	static final int BUTTON_HEIGHT = 24;
+	static final int BUTTON_WIDTH = 26;
+	static final int BUTTON_HEIGHT = 30;
 	private static final int GAP = 2;
 	static final int WIDTH = 2 * BUTTON_WIDTH + GAP;
 
@@ -45,7 +48,7 @@ class ChartTypeToggle
 	private void add(GeWidgets geWidgets, Widget parent, ChartType type, MarketLensSprite icon, int x, int y,
 		Consumer<ChartType> onSelect)
 	{
-		buttons.put(type, geWidgets.iconButton(parent, icon, type.getLabel() + " chart", "Show", x, y,
+		buttons.put(type, geWidgets.iconButton(parent, icon, type.getMenuName(), "Show", x, y,
 			BUTTON_WIDTH, BUTTON_HEIGHT, () -> onSelect.accept(type), () -> {}));
 	}
 }

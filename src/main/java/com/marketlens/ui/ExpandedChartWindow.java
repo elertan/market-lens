@@ -21,7 +21,9 @@ public class ExpandedChartWindow extends GeWindow
 {
 	/** Distance from the canvas edges, so a bit of the game stays visible around the window. */
 	private static final int MARGIN = 24;
-	private static final int CONTENT_TOP = 40;
+	/** Row with the timeframe tabs and the line/candles toggle, which is taller than the tabs. */
+	private static final int TAB_ROW_TOP = 36;
+	private static final int TAB_ROW_HEIGHT = ChartTypeToggle.BUTTON_HEIGHT;
 	private static final int PAD = 10;
 	private static final int TABS_TO_CHART = 4;
 
@@ -176,11 +178,11 @@ public class ExpandedChartWindow extends GeWindow
 		titleBar = new TitleBar(widgets, root, geWidgets.frame(root, w, h));
 		closeButton = geWidgets.closeButton(root, w, this::close);
 
-		int tabsHeight = TimeframeTabs.height(widgets);
-		tabs = new TimeframeTabs(widgets, root, PAD, CONTENT_TOP, state.getTimeframe(), onSelectTimeframe);
-		chartTypeToggle = new ChartTypeToggle(geWidgets, root, w - PAD - ChartTypeToggle.WIDTH,
-			CONTENT_TOP + (tabsHeight - ChartTypeToggle.BUTTON_HEIGHT) / 2, state.getChartType(), onSelectChartType);
-		int chartTop = CONTENT_TOP + tabsHeight + TABS_TO_CHART;
+		int tabsY = TAB_ROW_TOP + (TAB_ROW_HEIGHT - TimeframeTabs.height(widgets)) / 2;
+		tabs = new TimeframeTabs(widgets, root, PAD, tabsY, state.getTimeframe(), onSelectTimeframe);
+		chartTypeToggle = new ChartTypeToggle(geWidgets, root, w - PAD - ChartTypeToggle.WIDTH, TAB_ROW_TOP,
+			state.getChartType(), onSelectChartType);
+		int chartTop = TAB_ROW_TOP + TAB_ROW_HEIGHT + TABS_TO_CHART;
 		chartArea = geWidgets.chartPanel(root, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
 	}
 }

@@ -8,10 +8,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum ChartType
 {
-	LINE("Line"),
-	CANDLES("Candles");
+	LINE("Line", "Linechart"),
+	CANDLES("Candles", "Candlechart");
 
 	private final String label;
+	/** Name in the toggle button's menu option, e.g. "Show Linechart". */
+	private final String menuName;
 
 	@Override
 	public String toString()

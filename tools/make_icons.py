@@ -152,17 +152,17 @@ def expand_icon(size=13, arm=4):
 
 
 def line_icon():
-    """Chart type toggle: a line chart."""
-    c = Canvas(13, 13)
-    c.line([(1, 9), (3, 6), (5, 8), (8, 3), (11, 5)], GREEN)
+    """Chart type toggle: a line chart (16x16, for a button the size of Expand)."""
+    c = Canvas(16, 16)
+    c.line([(1, 11), (4, 7), (7, 10), (10, 4), (14, 6)], GREEN)
     return c.finish()
 
 
 def candle_icon():
-    """Chart type toggle: candlesticks."""
-    c = Canvas(13, 13)
+    """Chart type toggle: candlesticks (16x16, for a button the size of Expand)."""
+    c = Canvas(16, 16)
     for x, top, bottom, wick_top, wick_bottom, shade in [
-            (1, 6, 9, 4, 11, RED), (5, 3, 7, 1, 9, GREEN), (9, 4, 6, 2, 9, GREEN)]:
+            (1, 7, 11, 5, 14, RED), (6, 4, 9, 1, 11, GREEN), (11, 5, 8, 3, 11, GREEN)]:
         c.line([(x + 1, wick_top), (x + 1, wick_bottom)], shade, pen=1)
         c.rect(x, top, x + 2, bottom, shade)
     return c.finish()

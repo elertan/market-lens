@@ -14,7 +14,7 @@ import net.runelite.api.widgets.WidgetTextAlignment;
 /** A row of timeframe buttons on GE text-box sprites; the selected one is white. Client thread only. */
 class TimeframeTabs
 {
-	private static final int TAB_WIDTH = 30;
+	private static final int TAB_WIDTH = 29;
 	private static final int TAB_GAP = 2;
 	private static final Dimension FALLBACK_CAP = new Dimension(4, 20);
 

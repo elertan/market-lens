@@ -40,7 +40,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 	private static final int PAD = 10;
 	private static final int SUMMARY_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
-	private static final int TOGGLE_TO_EXPAND = 6;
+	private static final int TOGGLE_TO_EXPAND = 4;
 	private static final int EXPAND_BUTTON_WIDTH = 26;
 	private static final int EXPAND_BUTTON_HEIGHT = 30;
 
@@ -258,7 +258,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 		tabs = new TimeframeTabs(widgets, root, chartX, tabsY, state.getTimeframe(), this::selectTimeframe);
 		int expandX = w - PAD - EXPAND_BUTTON_WIDTH;
 		chartTypeToggle = new ChartTypeToggle(geWidgets, root, expandX - TOGGLE_TO_EXPAND - ChartTypeToggle.WIDTH,
-			rowY + (TAB_ROW_HEIGHT - ChartTypeToggle.BUTTON_HEIGHT) / 2, state.getChartType(), this::selectChartType);
+			rowY, state.getChartType(), this::selectChartType);
 		geWidgets.iconButton(root, MarketLensSprite.EXPAND_ICON, "Market Lens", "Expand",
 			expandX, rowY + (TAB_ROW_HEIGHT - EXPAND_BUTTON_HEIGHT) / 2,
 			EXPAND_BUTTON_WIDTH, EXPAND_BUTTON_HEIGHT, this::expand, () -> {});
