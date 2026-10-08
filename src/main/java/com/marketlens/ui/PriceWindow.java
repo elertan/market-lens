@@ -1,5 +1,7 @@
 package com.marketlens.ui;
 
+import com.marketlens.MarketLensConfig;
+import com.marketlens.chart.ChartType;
 import com.marketlens.chart.PriceFormat;
 import com.marketlens.price.GeTax;
 import com.marketlens.price.ItemMapping;
@@ -17,11 +19,12 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetTextAlignment;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.input.KeyListener;
 
 /**
  * The Market Lens window, built from native game widgets on top of the GE interface:
- * GE frame, title bar, back arrow, price summary, timeframe tabs and an expand button.
+ * GE frame, title bar, back arrow, price summary, timeframe tabs, a line/candles toggle and an expand button.
  * The chart itself is drawn by {@link GeChartOverlay} inside {@link #getChartBounds()}; the expand button
  * opens it in the {@link ExpandedChartWindow}. Client thread only, except {@link #keyPressed}.
  */
@@ -37,6 +40,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 	private static final int PAD = 10;
 	private static final int SUMMARY_WIDTH = 150;
 	private static final int ROW_HEIGHT = 15;
+	private static final int TOGGLE_TO_EXPAND = 6;
 	private static final int EXPAND_BUTTON_WIDTH = 26;
 	private static final int EXPAND_BUTTON_HEIGHT = 30;
 
@@ -46,10 +50,12 @@ public class PriceWindow extends GeWindow implements KeyListener
 	private final ChartState state;
 	private final SmallItemSprite smallItemSprite;
 	private final ExpandedChartWindow expandedWindow;
+	private final ConfigManager configManager;
 
 	private Widget chartArea;
 	private TitleBar titleBar;
 	private TimeframeTabs tabs;
+	private ChartTypeToggle chartTypeToggle;
 	private Widget buyValue;
 	private Widget buyAge;
 	private Widget sellValue;
@@ -62,7 +68,8 @@ public class PriceWindow extends GeWindow implements KeyListener
 
 	@Inject
 	PriceWindow(Client client, ClientThread clientThread, PriceService prices, ChartState state, WidgetFactory widgets,
-		GeWidgets geWidgets, SmallItemSprite smallItemSprite, ExpandedChartWindow expandedWindow)
+		GeWidgets geWidgets, SmallItemSprite smallItemSprite, ExpandedChartWindow expandedWindow,
+		ConfigManager configManager)
 	{
 		super(widgets, geWidgets);
 		this.client = client;
@@ -71,11 +78,13 @@ public class PriceWindow extends GeWindow implements KeyListener
 		this.state = state;
 		this.smallItemSprite = smallItemSprite;
 		this.expandedWindow = expandedWindow;
+		this.configManager = configManager;
 	}
 
-	public void open(int itemId, Timeframe timeframe)
+	public void open(int itemId, Timeframe timeframe, ChartType chartType)
 	{
 		state.open(itemId, timeframe);
+		state.setChartType(chartType);
 		prices.refresh(itemId, timeframe);
 		if (attach())
 		{
@@ -139,6 +148,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 		int itemSprite = smallItemSprite.spriteFor(itemId);
 		titleBar.show(itemName, itemSprite);
 		tabs.select(state.getTimeframe());
+		chartTypeToggle.select(state.getChartType());
 		expandedWindow.refresh(itemName, itemSprite);
 
 		LatestPrice latest = prices.getLatest(itemId);
@@ -246,8 +256,11 @@ public class PriceWindow extends GeWindow implements KeyListener
 		int rowY = CHART_TOP - TAB_ROW_HEIGHT - TABS_TO_CHART;
 		int tabsY = rowY + (TAB_ROW_HEIGHT - TimeframeTabs.height(widgets)) / 2;
 		tabs = new TimeframeTabs(widgets, root, chartX, tabsY, state.getTimeframe(), this::selectTimeframe);
+		int expandX = w - PAD - EXPAND_BUTTON_WIDTH;
+		chartTypeToggle = new ChartTypeToggle(geWidgets, root, expandX - TOGGLE_TO_EXPAND - ChartTypeToggle.WIDTH,
+			rowY + (TAB_ROW_HEIGHT - ChartTypeToggle.BUTTON_HEIGHT) / 2, state.getChartType(), this::selectChartType);
 		geWidgets.iconButton(root, MarketLensSprite.EXPAND_ICON, "Market Lens", "Expand",
-			w - PAD - EXPAND_BUTTON_WIDTH, rowY + (TAB_ROW_HEIGHT - EXPAND_BUTTON_HEIGHT) / 2,
+			expandX, rowY + (TAB_ROW_HEIGHT - EXPAND_BUTTON_HEIGHT) / 2,
 			EXPAND_BUTTON_WIDTH, EXPAND_BUTTON_HEIGHT, this::expand, () -> {});
 
 		chartArea = geWidgets.chartPanel(root, chartX, CHART_TOP, w - chartX - PAD, h - CHART_TOP - PAD);
@@ -285,7 +298,15 @@ public class PriceWindow extends GeWindow implements KeyListener
 
 	private void expand()
 	{
-		expandedWindow.open(this::selectTimeframe);
+		expandedWindow.open(this::selectTimeframe, this::selectChartType);
+		refresh();
+	}
+
+	/** Switches line/candles in both windows and remembers the choice in the plugin config. */
+	private void selectChartType(ChartType type)
+	{
+		state.setChartType(type);
+		configManager.setConfiguration(MarketLensConfig.GROUP, MarketLensConfig.CHART_TYPE_KEY, type);
 		refresh();
 	}
 

@@ -87,7 +87,7 @@ public class GeWidgets
 	 * on it. Hovering shows the GE's hover sprite, runs {@code onHover} and the menu shows "action name". At most 35x35; a smaller button
 	 * shows the four corners of the sprite through clipping layers, so its bevelled edges stay intact.
 	 */
-	public Widget iconButton(Widget parent, MarketLensSprite icon, String name, String action,
+	public IconButton iconButton(Widget parent, MarketLensSprite icon, String name, String action,
 		int x, int y, int w, int h, Runnable onClick, Runnable onHover)
 	{
 		Widget button = widgets.layer(parent, x, y, w, h);
@@ -101,17 +101,18 @@ public class GeWidgets
 		background.add(buttonCorner(button, leftWidth, 0, w - leftWidth, topHeight, right, 0));
 		background.add(buttonCorner(button, 0, topHeight, leftWidth, h - topHeight, 0, bottom));
 		background.add(buttonCorner(button, leftWidth, topHeight, w - leftWidth, h - topHeight, right, bottom));
-		widgets.sprite(button, icon.getSpriteId(), (w - icon.getWidth()) / 2, (h - icon.getHeight()) / 2,
-			icon.getWidth(), icon.getHeight());
+		Widget iconWidget = widgets.sprite(button, icon.getSpriteId(), (w - icon.getWidth()) / 2,
+			(h - icon.getHeight()) / 2, icon.getWidth(), icon.getHeight());
 
+		IconButton result = new IconButton(button, background, iconWidget);
 		makeClickable(button, name, action, onClick);
 		button.setOnMouseOverListener((JavaScriptCallback) e ->
 		{
-			setSprite(background, SpriteID.GeIcons.BUTTON_HOVERED);
+			result.setHovered(true);
 			onHover.run();
 		});
-		button.setOnMouseLeaveListener((JavaScriptCallback) e -> setSprite(background, SpriteID.GeIcons.BUTTON));
-		return button;
+		button.setOnMouseLeaveListener((JavaScriptCallback) e -> result.setHovered(false));
+		return result;
 	}
 
 	/** The GE's close button (X), at the GE's position in the top-right of a frame of width {@code frameWidth}. */
@@ -152,14 +153,6 @@ public class GeWidgets
 	{
 		Widget clip = widgets.layer(button, x, y, w, h);
 		return widgets.sprite(clip, SpriteID.GeIcons.BUTTON, spriteX - x, spriteY - y, SMALL_BUTTON_SIZE, SMALL_BUTTON_SIZE);
-	}
-
-	private static void setSprite(List<Widget> sprites, int spriteId)
-	{
-		for (Widget sprite : sprites)
-		{
-			sprite.setSpriteId(spriteId);
-		}
 	}
 
 	private static void makeClickable(Widget widget, String name, String action, Runnable onClick)

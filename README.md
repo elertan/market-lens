@@ -11,6 +11,7 @@ When you set up a buy or sell offer, a **Market Lens** button (the price-chart i
 - The price you chose on the GE offer screen, as a line on the chart in the GE's own price colour, so you can see where your offer sits
 - Dense data is merged into larger intervals (15m, 1h, ...) using volume-weighted averages, so the lines stay readable without losing accuracy; zoom in for every single bucket
 - Timeframes: 1H, 6H, 24H, 1W, 1M, 6M, 1Y
+- Line or candlestick chart, switched with the buttons next to the timeframes and remembered in the plugin settings
 - An expand button that opens the chart over most of the game screen
 
 Chart controls: scroll to zoom (hold Shift or Ctrl to zoom around the cursor), drag to pan, double-click to reset. Press Esc or the back arrow to close the window; in the expanded chart, Esc or the close button returns to the normal view.
@@ -31,6 +32,10 @@ The plugin only asks the wiki for data while you use it, and never more often th
 | Item names and buy limits | Once per session | After a failure, retries wait 5s, 10s, 20s... up to 5 minutes |
 
 Requests run off the client thread, use RuneLite's HTTP client and send a User-Agent with this repository's URL, as the wiki asks.
+
+### Candlesticks
+
+The wiki API has no open/close prices or single-trade highs and lows, only each bucket's average instant-buy and instant-sell price. Candles are therefore built from those averages: a candle opens at the previous candle's close, closes at the midpoint of its last bucket, and its wicks run from the highest average instant-buy price to the lowest average instant-sell price. They show the trend and spread faithfully, but the wicks are averages rather than individual trades.
 
 ### Why the expanded chart takes all clicks
 

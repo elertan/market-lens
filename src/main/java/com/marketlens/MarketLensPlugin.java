@@ -64,7 +64,7 @@ public class MarketLensPlugin extends Plugin
 	protected void startUp()
 	{
 		spriteManager.addSpriteOverrides(MarketLensSprite.values());
-		buttonInjector.setOnClick(itemId -> window.open(itemId, config.defaultTimeframe()));
+		buttonInjector.setOnClick(itemId -> window.open(itemId, config.defaultTimeframe(), config.chartType()));
 		// Start loading as soon as the user points at the button, so the data is usually ready by the click.
 		buttonInjector.setOnHover(itemId -> priceService.refresh(itemId, config.defaultTimeframe()));
 		priceService.setOnUpdate(() -> clientThread.invokeLater(window::refresh));

@@ -143,13 +143,18 @@ public final class ChartScale
 	/** The visible point closest to {@code time}. */
 	public TimeseriesPoint nearest(double time)
 	{
-		TimeseriesPoint best = points.get(first);
+		return points.get(nearestIndex(time));
+	}
+
+	/** Index of the visible point closest to {@code time}. */
+	public int nearestIndex(double time)
+	{
+		int best = first;
 		for (int i = first + 1; i <= last; i++)
 		{
-			TimeseriesPoint p = points.get(i);
-			if (Math.abs(p.getTimestamp() - time) < Math.abs(best.getTimestamp() - time))
+			if (Math.abs(points.get(i).getTimestamp() - time) < Math.abs(points.get(best).getTimestamp() - time))
 			{
-				best = p;
+				best = i;
 			}
 		}
 		return best;

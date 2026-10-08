@@ -1,5 +1,6 @@
 package com.marketlens.ui;
 
+import com.marketlens.chart.ChartType;
 import com.marketlens.price.Timeframe;
 import java.awt.Rectangle;
 import java.util.function.Consumer;
@@ -29,9 +30,11 @@ public class ExpandedChartWindow extends GeWindow
 
 	private boolean open;
 	private Consumer<Timeframe> onSelectTimeframe = tf -> {};
+	private Consumer<ChartType> onSelectChartType = type -> {};
 	private Widget chartArea;
 	private TitleBar titleBar;
 	private TimeframeTabs tabs;
+	private ChartTypeToggle chartTypeToggle;
 	private Widget closeButton;
 	/**
 	 * Canvas bounds of the whole window, read by mouse input on the AWT thread. Updated every client tick:
@@ -52,10 +55,14 @@ public class ExpandedChartWindow extends GeWindow
 		return open;
 	}
 
-	/** @param onSelectTimeframe called when a timeframe tab is clicked */
-	public void open(Consumer<Timeframe> onSelectTimeframe)
+	/**
+	 * @param onSelectTimeframe called when a timeframe tab is clicked
+	 * @param onSelectChartType called when the line/candles toggle is clicked
+	 */
+	public void open(Consumer<Timeframe> onSelectTimeframe, Consumer<ChartType> onSelectChartType)
 	{
 		this.onSelectTimeframe = onSelectTimeframe;
+		this.onSelectChartType = onSelectChartType;
 		open = attach();
 	}
 
@@ -101,10 +108,11 @@ public class ExpandedChartWindow extends GeWindow
 		{
 			titleBar.show(itemName, itemSpriteId);
 			tabs.select(state.getTimeframe());
+			chartTypeToggle.select(state.getChartType());
 		}
 	}
 
-	/** Performs a left click at canvas point x,y: the close button or a timeframe tab. */
+	/** Performs a left click at canvas point x,y: the close button, a timeframe tab or the chart type toggle. */
 	public void clickAt(int x, int y)
 	{
 		if (!open || !isAttached())
@@ -120,6 +128,12 @@ public class ExpandedChartWindow extends GeWindow
 		if (timeframe != null)
 		{
 			onSelectTimeframe.accept(timeframe);
+			return;
+		}
+		ChartType chartType = chartTypeToggle.at(x, y);
+		if (chartType != null)
+		{
+			onSelectChartType.accept(chartType);
 		}
 	}
 
@@ -162,8 +176,11 @@ public class ExpandedChartWindow extends GeWindow
 		titleBar = new TitleBar(widgets, root, geWidgets.frame(root, w, h));
 		closeButton = geWidgets.closeButton(root, w, this::close);
 
+		int tabsHeight = TimeframeTabs.height(widgets);
 		tabs = new TimeframeTabs(widgets, root, PAD, CONTENT_TOP, state.getTimeframe(), onSelectTimeframe);
-		int chartTop = CONTENT_TOP + TimeframeTabs.height(widgets) + TABS_TO_CHART;
+		chartTypeToggle = new ChartTypeToggle(geWidgets, root, w - PAD - ChartTypeToggle.WIDTH,
+			CONTENT_TOP + (tabsHeight - ChartTypeToggle.BUTTON_HEIGHT) / 2, state.getChartType(), onSelectChartType);
+		int chartTop = CONTENT_TOP + tabsHeight + TABS_TO_CHART;
 		chartArea = geWidgets.chartPanel(root, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
 	}
 }

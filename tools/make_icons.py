@@ -1,8 +1,8 @@
 """Generates the Market Lens icons in an OSRS-like pixel style: shaded colours and a dark outline.
 
 Usage: python3 tools/make_icons.py [preview-dir]
-Writes chart_icon.png (GE button), chart_icon_small.png (title bar) and expand_icon.png to the plugin
-resources, and icon.png (the Plugin Hub icon: the chart icon at 2x) to the repository root.
+Writes chart_icon.png (GE button), chart_icon_small.png (title bar), expand_icon.png and the chart type
+icons line_icon.png and candle_icon.png to the plugin resources, and icon.png (the Plugin Hub icon: the chart icon at 2x) to the repository root.
 With a preview directory, also writes every icon scaled 8x there.
 
 The drawing helpers are shared with tools/icon_concepts.py, which keeps the other icon designs.
@@ -151,6 +151,23 @@ def expand_icon(size=13, arm=4):
     return c.finish()
 
 
+def line_icon():
+    """Chart type toggle: a line chart."""
+    c = Canvas(13, 13)
+    c.line([(1, 9), (3, 6), (5, 8), (8, 3), (11, 5)], GREEN)
+    return c.finish()
+
+
+def candle_icon():
+    """Chart type toggle: candlesticks."""
+    c = Canvas(13, 13)
+    for x, top, bottom, wick_top, wick_bottom, shade in [
+            (1, 6, 9, 4, 11, RED), (5, 3, 7, 1, 9, GREEN), (9, 4, 6, 2, 9, GREEN)]:
+        c.line([(x + 1, wick_top), (x + 1, wick_bottom)], shade, pen=1)
+        c.rect(x, top, x + 2, bottom, shade)
+    return c.finish()
+
+
 def write_png(path, pixels, scale=1):
     """RGBA PNG; empty pixels are transparent."""
     raw = b''
@@ -167,7 +184,8 @@ def write_png(path, pixels, scale=1):
 
 
 def main():
-    icons = {'chart_icon': chart_icon(), 'chart_icon_small': chart_icon_small(), 'expand_icon': expand_icon()}
+    icons = {'chart_icon': chart_icon(), 'chart_icon_small': chart_icon_small(), 'expand_icon': expand_icon(),
+        'line_icon': line_icon(), 'candle_icon': candle_icon()}
     for name, pixels in icons.items():
         write_png(RESOURCES / f'{name}.png', pixels)
         if len(sys.argv) > 1:

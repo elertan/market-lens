@@ -1,5 +1,6 @@
 package com.marketlens.ui;
 
+import com.marketlens.chart.ChartType;
 import com.marketlens.chart.ChartViewport;
 import com.marketlens.price.Timeframe;
 import com.marketlens.price.TimeseriesPoint;
@@ -26,6 +27,9 @@ public class ChartState
 	private volatile int itemId = -1;
 	@Getter
 	private volatile Timeframe timeframe = Timeframe.ONE_DAY;
+	@Getter
+	@Setter
+	private volatile ChartType chartType = ChartType.LINE;
 	/** Plot area in canvas coordinates, published by the renderer every frame for mouse input. */
 	@Getter
 	@Setter

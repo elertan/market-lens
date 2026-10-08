@@ -1,6 +1,9 @@
 package com.marketlens.ui;
 
 import com.marketlens.chart.AxisTicks;
+import com.marketlens.chart.Candle;
+import com.marketlens.chart.Candles;
+import com.marketlens.chart.ChartType;
 import com.marketlens.chart.ChartScale;
 import com.marketlens.chart.Downsample;
 import com.marketlens.chart.LabelLayout;
@@ -23,13 +26,14 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.client.ui.FontManager;
 
 /**
- * Draws the price chart into a given area: grid, axes, volume bars, high/low lines, live price tags, the price
- * chosen on the GE offer screen and a TradingView-style crosshair. Shared by the normal and the expanded chart, so both look the same at any size.
+ * Draws the price chart into a given area: grid, axes, volume bars, high/low lines or candlesticks, live price
+ * tags, the price chosen on the GE offer screen and a TradingView-style crosshair. Shared by the normal and the expanded chart, so both look the same at any size.
  * The geometry lives in {@link ChartScale}; this class only draws. When buckets would be drawn closer than a few
  * pixels apart, they are merged first ({@link Downsample}), so dense series stay readable. Client thread only.
  */
@@ -45,9 +49,14 @@ public class ChartRenderer
 	private static final int MIN_PX_PER_DOT = 5;
 	/** Below this spacing, neighbouring buckets are merged so the lines stay readable (see {@link Downsample}). */
 	private static final int MIN_PX_PER_POINT = 2;
+	/** Candles need room for a visible body, so they are merged until they are at least this far apart. */
+	private static final int MIN_PX_PER_CANDLE = 5;
+	/** Candle body width as a fraction of the space per candle. */
+	private static final double CANDLE_BODY_FRACTION = 0.6;
 	private static final int DOT_SIZE = 3;
 
 	private static final Stroke LINE = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+	private static final Stroke THIN = new BasicStroke(1f);
 	private static final Stroke DASHED = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
 		10f, new float[]{3f, 3f}, 0f);
 
@@ -61,6 +70,11 @@ public class ChartRenderer
 	private List<TimeseriesPoint> mergedSource;
 	private long mergedInterval;
 	private List<TimeseriesPoint> merged;
+	/** Last candle build, reused until the series or the interval changes; candlePoints match candles by index. */
+	private List<TimeseriesPoint> candleSource;
+	private long candleInterval;
+	private List<Candle> candles;
+	private List<TimeseriesPoint> candlePoints;
 
 	@Inject
 	ChartRenderer(ChartState state, PriceService prices, GeOffer offer)
@@ -100,8 +114,17 @@ public class ChartRenderer
 
 			double start = state.getViewport().getStart();
 			double end = state.getViewport().getEnd();
-			long interval = Downsample.interval(state.getBucketSeconds(), (end - start) / plot.width, MIN_PX_PER_POINT);
-			List<TimeseriesPoint> points = pointsAt(series.getPoints(), interval);
+			boolean candleMode = state.getChartType() == ChartType.CANDLES;
+			long interval = Downsample.interval(state.getBucketSeconds(), (end - start) / plot.width,
+				candleMode ? MIN_PX_PER_CANDLE : MIN_PX_PER_POINT);
+			List<Candle> candleList = candleMode ? candlesAt(series.getPoints(), interval) : null;
+			List<TimeseriesPoint> points = candleMode ? candlePoints : pointsAt(series.getPoints(), interval);
+			if (points.isEmpty())
+			{
+				text.drawCentered(statusText(PriceService.Status.READY), area.x + area.width / 2,
+					area.y + area.height / 2, Palette.TEXT_ORANGE);
+				return;
+			}
 
 			LatestPrice latest = prices.getLatest(state.getItemId());
 			Long offerPrice = offer.priceFor(state.getItemId());
@@ -109,7 +132,7 @@ public class ChartRenderer
 				latest == null || latest.getHigh() == null ? null : latest.getHigh().doubleValue(),
 				latest == null || latest.getLow() == null ? null : latest.getLow().doubleValue(),
 				offerPrice == null ? null : offerPrice.doubleValue());
-			new Frame(g, text, area, scale, points, interval, latest, offerPrice).draw();
+			new Frame(g, text, area, scale, points, candleList, interval, latest, offerPrice).draw();
 		}
 		finally
 		{
@@ -131,6 +154,19 @@ public class ChartRenderer
 			mergedInterval = interval;
 		}
 		return merged;
+	}
+
+	/** Candles for the series at {@code interval}; also fills {@link #candlePoints}. */
+	private List<Candle> candlesAt(List<TimeseriesPoint> points, long interval)
+	{
+		if (points != candleSource || interval != candleInterval)
+		{
+			candles = Candles.build(points, interval);
+			candlePoints = candles.stream().map(Candle::asPoint).collect(Collectors.toList());
+			candleSource = points;
+			candleInterval = interval;
+		}
+		return candles;
 	}
 
 	private static String statusText(PriceService.Status status)
@@ -155,6 +191,8 @@ public class ChartRenderer
 		private final ChartScale scale;
 		private final Rectangle plot;
 		private final List<TimeseriesPoint> points;
+		/** The candles behind {@link #points} in candle mode, by the same index; null for the line chart. */
+		private final List<Candle> candles;
 		/** Seconds per point: the series' bucket size, or the merged interval. */
 		private final long interval;
 		private final LatestPrice latest;
@@ -162,7 +200,7 @@ public class ChartRenderer
 		private final Long offerPrice;
 
 		Frame(Graphics2D g, ChartText text, Rectangle area, ChartScale scale, List<TimeseriesPoint> points,
-			long interval, LatestPrice latest, Long offerPrice)
+			List<Candle> candles, long interval, LatestPrice latest, Long offerPrice)
 		{
 			this.g = g;
 			this.text = text;
@@ -170,6 +208,7 @@ public class ChartRenderer
 			this.scale = scale;
 			this.plot = scale.getPlot();
 			this.points = points;
+			this.candles = candles;
 			this.interval = interval;
 			this.latest = latest;
 			this.offerPrice = offerPrice;
@@ -185,13 +224,44 @@ public class ChartRenderer
 			Shape clip = g.getClip();
 			g.clip(plot);
 			drawVolume();
-			drawLine(TimeseriesPoint::getAvgHighPrice, Palette.BUY_COLOR);
-			drawLine(TimeseriesPoint::getAvgLowPrice, Palette.SELL_COLOR);
+			if (candles != null)
+			{
+				drawCandles();
+			}
+			else
+			{
+				drawLine(TimeseriesPoint::getAvgHighPrice, Palette.BUY_COLOR);
+				drawLine(TimeseriesPoint::getAvgLowPrice, Palette.SELL_COLOR);
+			}
 			g.setClip(clip);
 
 			drawTags(tags);
-			TimeseriesPoint hovered = drawCrosshair();
-			drawLegend(hovered != null ? hovered : points.get(scale.getLast()));
+			int hovered = drawCrosshair();
+			drawLegend(hovered >= 0 ? hovered : scale.getLast());
+		}
+
+		/** Candlesticks: a 1-px wick from high to low and a body from open to close, green when it closed higher. */
+		private void drawCandles()
+		{
+			int body = Math.max(1, (int) (scale.bucketWidth() * CANDLE_BODY_FRACTION));
+			if (body % 2 == 0)
+			{
+				body--;  // odd width keeps the wick in the middle
+			}
+			// Crisp pixels: no anti-aliasing for the boxes and wicks.
+			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+			g.setStroke(THIN);
+			for (int i = scale.getFirst(); i <= scale.getLast(); i++)
+			{
+				Candle c = candles.get(i);
+				int x = scale.x(c.getTimestamp());
+				int top = scale.y(Math.max(c.getOpen(), c.getClose()));
+				int bottom = scale.y(Math.min(c.getOpen(), c.getClose()));
+				g.setColor(c.isUp() ? Palette.BUY_COLOR : Palette.SELL_COLOR);
+				g.drawLine(x, scale.y(c.getHigh()), x, scale.y(c.getLow()));
+				g.fillRect(x - body / 2, top, body, Math.max(1, bottom - top + 1));
+			}
+			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		}
 
 		/** Horizontal grid + right axis labels, leaving out labels that a price tag would cover. */
@@ -349,17 +419,18 @@ public class ChartRenderer
 			}
 		}
 
-		/** Crosshair snapped to the nearest bucket. Returns that bucket, or null when not hovering. */
-		private TimeseriesPoint drawCrosshair()
+		/** Crosshair snapped to the nearest point. Returns that point's index, or -1 when not hovering. */
+		private int drawCrosshair()
 		{
 			int mx = state.getHoverX();
 			int my = state.getHoverY();
 			if (!plot.contains(mx, my))
 			{
-				return null;
+				return -1;
 			}
 
-			TimeseriesPoint nearest = scale.nearest(scale.timeAt(mx));
+			int index = scale.nearestIndex(scale.timeAt(mx));
+			TimeseriesPoint nearest = points.get(index);
 			int x = scale.x(nearest.getTimestamp());
 			g.setStroke(DASHED);
 			g.setColor(Palette.CROSSHAIR);
@@ -379,16 +450,32 @@ public class ChartRenderer
 			g.setColor(Palette.LABEL_BACKGROUND);
 			g.fillRect(boxX, boxY, w, boxHeight);
 			text.draw(time, boxX + 4, text.baselineFor(boxY + boxHeight / 2), Palette.TEXT);
-			return nearest;
+			return index;
 		}
 
 		/** "High 828,861  Low 808,000  Vol 16" for the hovered or newest bucket. */
-		private void drawLegend(TimeseriesPoint p)
+		/**
+		 * Readout for the hovered or newest point: "High 828,861  Low 808,000  Vol 16" for lines,
+		 * "O 137  H 139  L 134  C 136  Vol 16" for candles (close coloured by direction).
+		 */
+		private void drawLegend(int index)
 		{
+			TimeseriesPoint p = points.get(index);
 			int x = area.x + INSET;
 			int y = area.y + text.ascent() + 3;
-			x = legendItem("High ", p.getAvgHighPrice(), Palette.BUY_COLOR, x, y);
-			x = legendItem("Low ", p.getAvgLowPrice(), Palette.SELL_COLOR, x, y);
+			if (candles != null)
+			{
+				Candle c = candles.get(index);
+				x = legendItem("O ", c.getOpen(), Palette.TEXT, x, y);
+				x = legendItem("H ", c.getHigh(), Palette.TEXT, x, y);
+				x = legendItem("L ", c.getLow(), Palette.TEXT, x, y);
+				x = legendItem("C ", c.getClose(), c.isUp() ? Palette.BUY_COLOR : Palette.SELL_COLOR, x, y);
+			}
+			else
+			{
+				x = legendItem("High ", p.getAvgHighPrice(), Palette.BUY_COLOR, x, y);
+				x = legendItem("Low ", p.getAvgLowPrice(), Palette.SELL_COLOR, x, y);
+			}
 			text.draw("Vol ", x, y, Palette.TEXT_MUTED);
 			text.draw(PriceFormat.exact(p.totalVolume()), x + text.width("Vol "), y, Palette.TEXT);
 		}
