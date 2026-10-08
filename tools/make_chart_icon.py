@@ -1,64 +1,91 @@
-"""Generates the Market Lens button icon (a green and a red price line).
+"""Generates the Market Lens button icon: a green and a red price line, shaded like OSRS icons.
 
 Usage: python3 tools/make_chart_icon.py src/main/resources/com/marketlens/ui/chart_icon.png [preview.png]
 The optional preview is the same icon scaled 8x.
 """
-import sys, zlib, struct
+import struct
+import sys
+import zlib
 
-W, H = 26, 24
-GREEN = (0x1E, 0xD6, 0x1E, 255)
-RED = (0xF0, 0x40, 0x40, 255)
-BLACK = (0, 0, 0, 255)
+# Same size as the GE's own small icons (search, guide price).
+W, H = 20, 18
 
-def line(px, x0, y0, x1, y1, color):
+# Muted, shaded colours as used in OSRS icons: highlight on top, base below, dark outline.
+GREEN = {'light': (0x8C, 0xD8, 0x4A), 'base': (0x3A, 0x9A, 0x22)}
+RED = {'light': (0xF0, 0x86, 0x5C), 'base': (0xB0, 0x2E, 0x1E)}
+OUTLINE = (0x14, 0x10, 0x0A)
+
+# Zigzag like a price chart; red follows green lower down, leaving a small gap.
+SHAPE = [(1, 8), (5, 4), (8, 9), (12, 1), (15, 6), (18, 3)]
+RED_OFFSET = 6
+
+
+def plot_line(mask, x0, y0, x1, y1):
+    """Bresenham line, 2px tall: the top pixel is shaded light, the lower one dark."""
     dx, dy = abs(x1 - x0), -abs(y1 - y0)
     sx, sy = (1 if x0 < x1 else -1), (1 if y0 < y1 else -1)
     err = dx + dy
     while True:
-        for tx in (0, 1):  # 2x2 pen: thick in every direction
-            for ty in (0, 1):
-                if 0 <= x0 + tx < W and 0 <= y0 + ty < H:
-                    px[y0 + ty][x0 + tx] = color
+        for ty in (0, 1):
+            if 0 <= y0 + ty < H:
+                mask[y0 + ty][x0] = True
         if x0 == x1 and y0 == y1:
-            break
+            return
         e2 = 2 * err
         if e2 >= dy:
-            err += dy; x0 += sx
+            err += dy
+            x0 += sx
         if e2 <= dx:
-            err += dx; y0 += sy
+            err += dx
+            y0 += sy
 
-def polyline(px, pts, color):
-    for (a, b) in zip(pts, pts[1:]):
-        line(px, a[0], a[1], b[0], b[1], color)
 
-def outline(px):
-    out = [row[:] for row in px]
+def line_mask(points):
+    mask = [[False] * W for _ in range(H)]
+    for a, b in zip(points, points[1:]):
+        plot_line(mask, a[0], a[1], b[0], b[1])
+    return mask
+
+
+def paint(pixels, mask, colours):
+    """Top pixel of each column run gets the highlight, the rest the base colour."""
     for y in range(H):
         for x in range(W):
-            if px[y][x][3] == 0 and any(
-                0 <= x + dx < W and 0 <= y + dy < H and px[y + dy][x + dx][3] and px[y + dy][x + dx] != BLACK
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                out[y][x] = BLACK
+            if mask[y][x]:
+                top = y == 0 or not mask[y - 1][x]
+                pixels[y][x] = colours['light'] if top else colours['base']
+
+
+def add_outline(pixels):
+    out = [row[:] for row in pixels]
+    for y in range(H):
+        for x in range(W):
+            if pixels[y][x] is None and any(
+                    0 <= x + dx < W and 0 <= y + dy < H and pixels[y + dy][x + dx] not in (None, OUTLINE)
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                out[y][x] = OUTLINE
     return out
 
-def png(path, px, scale=1):
-    rows = b''
-    for row in px:
-        for _ in range(scale):
-            rows += b'\x00' + b''.join(bytes(c) * 1 for c in row for _ in range(scale))
-    def chunk(t, d):
-        return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
-    w, h = len(px[0]) * scale, len(px) * scale
-    data = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0))
-    data += chunk(b'IDAT', zlib.compress(rows, 9)) + chunk(b'IEND', b'')
-    open(path, 'wb').write(data)
 
-px = [[(0, 0, 0, 0)] * W for _ in range(H)]
-# Zigzag like a price chart; red follows green 8px lower, leaving a small gap.
-SHAPE = [(1, 11), (5, 5), (9, 13), (14, 1), (18, 9), (23, 4)]
-polyline(px, [(x, y + 8) for x, y in SHAPE], RED)
-polyline(px, SHAPE, GREEN)
-px = outline(px)
-png(sys.argv[1], px)
+def write_png(path, pixels, scale=1):
+    raw = b''
+    for row in pixels:
+        line = b''.join((bytes(c) + b'\xff' if c else b'\x00\x00\x00\x00') * scale for c in row)
+        raw += (b'\x00' + line) * scale
+
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
+
+    header = struct.pack('>IIBBBBB', W * scale, H * scale, 8, 6, 0, 0, 0)
+    with open(path, 'wb') as f:
+        f.write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
+
+
+pixels = [[None] * W for _ in range(H)]
+paint(pixels, line_mask([(x, y + RED_OFFSET) for x, y in SHAPE]), RED)
+paint(pixels, line_mask(SHAPE), GREEN)
+pixels = add_outline(pixels)
+
+write_png(sys.argv[1], pixels)
 if len(sys.argv) > 2:
-    png(sys.argv[2], px, 8)
+    write_png(sys.argv[2], pixels, 8)

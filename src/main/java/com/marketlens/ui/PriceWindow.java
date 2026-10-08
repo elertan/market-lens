@@ -55,6 +55,7 @@ public class PriceWindow implements KeyListener
 	private final ChartState state;
 	private final WidgetFactory widgets;
 	private final GeWidgets geWidgets;
+	private final SmallItemSprite smallItemSprite;
 
 	private Widget root;
 	private Widget chartArea;
@@ -73,7 +74,7 @@ public class PriceWindow implements KeyListener
 
 	@Inject
 	PriceWindow(Client client, ClientThread clientThread, PriceService prices, ChartState state, WidgetFactory widgets,
-		GeWidgets geWidgets)
+		GeWidgets geWidgets, SmallItemSprite smallItemSprite)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
@@ -81,6 +82,7 @@ public class PriceWindow implements KeyListener
 		this.state = state;
 		this.widgets = widgets;
 		this.geWidgets = geWidgets;
+		this.smallItemSprite = smallItemSprite;
 	}
 
 	public void open(int itemId, Timeframe timeframe)
@@ -100,6 +102,7 @@ public class PriceWindow implements KeyListener
 		}
 		root = null;
 		chartArea = null;
+		smallItemSprite.clear();
 	}
 
 	/** Rebuilds the window if the game discarded our widgets while it should be open. */
@@ -180,8 +183,8 @@ public class PriceWindow implements KeyListener
 		FontTypeFace font = title.getFont();
 		int textWidth = font != null ? font.getTextWidth(title.getText()) : title.getText().length() * 8;
 		int titleCenterX = title.getOriginalX() + title.getOriginalWidth() / 2;
-		itemIcon.setItemId(itemId);
-		itemIcon.setOriginalX(titleCenterX - textWidth / 2 - ICON_GAP - GeWidgets.ITEM_WIDTH);
+		smallItemSprite.show(itemId);
+		itemIcon.setOriginalX(titleCenterX - textWidth / 2 - ICON_GAP - SmallItemSprite.WIDTH);
 		itemIcon.revalidate();
 	}
 
@@ -238,7 +241,8 @@ public class PriceWindow implements KeyListener
 		root.setNoClickThrough(true);
 		root.setNoScrollThrough(true);
 		title = geWidgets.frame(root, w, h);
-		itemIcon = geWidgets.itemIcon(root, 0, TITLE_CENTER_Y - GeWidgets.ITEM_HEIGHT / 2);
+		itemIcon = widgets.sprite(root, SmallItemSprite.SPRITE_ID, 0, TITLE_CENTER_Y - SmallItemSprite.HEIGHT / 2,
+			SmallItemSprite.WIDTH, SmallItemSprite.HEIGHT);
 		widgets.text(root, "Market Lens", FontID.PLAIN_11, Palette.MUTED, WidgetTextAlignment.LEFT, BRAND_LEFT, 6, 120, 24);
 		geWidgets.backArrow(root, h, this::close);
 		buildSummary(h);

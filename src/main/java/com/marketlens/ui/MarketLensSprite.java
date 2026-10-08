@@ -13,7 +13,7 @@ import net.runelite.client.game.SpriteOverride;
 public enum MarketLensSprite implements SpriteOverride
 {
 	/** Green and red price lines; made by tools/make_chart_icon.py. */
-	CHART_ICON(-5401, "chart_icon.png", 26, 24);
+	CHART_ICON(-5401, "chart_icon.png", 20, 18);
 
 	private final int spriteId;
 	private final String fileName;

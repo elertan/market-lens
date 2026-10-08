@@ -4,7 +4,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.FontID;
 import net.runelite.api.gameval.SpriteID;
-import net.runelite.api.widgets.ItemQuantityMode;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetTextAlignment;
@@ -34,10 +33,6 @@ public class GeWidgets
 	private static final int BACK_ARROW_LEFT = 17;
 	private static final int BACK_ARROW_BOTTOM = 47;
 	private static final int BACK_ARROW_HOVER_OPACITY = 100;
-
-	/** Item icons are 36x32, as in inventories and GE slots. */
-	public static final int ITEM_WIDTH = 36;
-	public static final int ITEM_HEIGHT = 32;
 
 	private final WidgetFactory widgets;
 
@@ -102,14 +97,6 @@ public class GeWidgets
 		arrow.setOnMouseOverListener((JavaScriptCallback) e -> arrow.setOpacity(BACK_ARROW_HOVER_OPACITY));
 		arrow.setOnMouseLeaveListener((JavaScriptCallback) e -> arrow.setOpacity(0));
 		return arrow;
-	}
-
-	/** A bare item icon without a quantity. Set the item on it with {@link Widget#setItemId}. */
-	public Widget itemIcon(Widget parent, int x, int y)
-	{
-		Widget item = widgets.sprite(parent, -1, x, y, ITEM_WIDTH, ITEM_HEIGHT);
-		item.setItemQuantityMode(ItemQuantityMode.NEVER);
-		return item;
 	}
 
 	private static void makeClickable(Widget widget, String name, String action, Runnable onClick)
