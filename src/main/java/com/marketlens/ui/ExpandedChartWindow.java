@@ -37,7 +37,10 @@ public class ExpandedChartWindow
 	private TitleBar titleBar;
 	private TimeframeTabs tabs;
 	private Widget closeButton;
-	/** Canvas bounds of the whole window, read by mouse input on the AWT thread. */
+	/**
+	 * Canvas bounds of the whole window, read by mouse input on the AWT thread. Updated every client tick:
+	 * new widgets only get a screen position once the client has drawn them.
+	 */
 	private volatile Rectangle bounds;
 	private int builtWidth;
 	private int builtHeight;
@@ -102,13 +105,18 @@ public class ExpandedChartWindow
 	 */
 	public boolean ensureAttached()
 	{
-		if (!open || isAttached())
+		if (!open)
 		{
 			return false;
 		}
-		removeWidgets();
-		build();
-		return true;
+		boolean rebuilt = !isAttached();
+		if (rebuilt)
+		{
+			removeWidgets();
+			build();
+		}
+		bounds = root == null ? null : root.getBounds();
+		return rebuilt;
 	}
 
 	/** Canvas bounds of the chart area, or null when the window is not showing. */
@@ -151,7 +159,6 @@ public class ExpandedChartWindow
 		int chartTop = CONTENT_TOP + TimeframeTabs.height(widgets) + TABS_TO_CHART;
 		chartArea = widgets.rect(root, Palette.CHART_BACKGROUND, 120, true, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
 		widgets.rect(root, Palette.DIVIDER, 0, false, PAD, chartTop, w - 2 * PAD, h - chartTop - PAD);
-		bounds = root.getBounds();
 	}
 
 	private void removeWidgets()
