@@ -1,4 +1,4 @@
-# <img src="src/main/resources/com/marketlens/ui/chart_icon.png" alt="" width="40"> Market Lens
+# <img src="icon.png" alt="" width="40"> Market Lens
 
 A RuneLite plugin that adds real-time Grand Exchange price charts to the GE offer screen.
 
@@ -15,16 +15,47 @@ Chart controls: scroll to zoom (hold Shift or Ctrl to zoom around the cursor), d
 
 Price data comes from the [OSRS Wiki real-time prices API](https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices).
 
+## Design notes
+
+### Price data
+
+The plugin only asks the wiki for data while you use it, and never more often than the data can change:
+
+| Data | When | How often |
+| --- | --- | --- |
+| Live buy/sell price | Market Lens is open, or you hover the Market Lens button | Per item, at most once a minute (the API caches it for 60s) |
+| Chart series | Same | Per item and timeframe, at most once per bucket: 5 min (1H/6H/24H), 1 hour (1W), 6 hours (1M), 1 day (6M/1Y). A failed request retries after 5 seconds. |
+| Volume (1h) | Same | Summed from the item's 5-minute series, so no extra all-item download |
+| Item names and buy limits | Once per session | After a failure, retries wait 5s, 10s, 20s... up to 5 minutes |
+
+Requests run off the client thread, use RuneLite's HTTP client and send a User-Agent with this repository's URL, as the wiki asks.
+
+### Why the expanded chart takes all clicks
+
+The expanded chart covers most of the game screen, including the minimap. Some parts of the game, like the minimap, react to a raw mouse click rather than to a menu option, so blocking click-through on the window's widgets isn't enough: clicking the close button over the minimap would also walk your character there. While the expanded chart is open, the plugin therefore takes every click inside it before the game sees it and handles its own buttons itself (`ExpandedWindowInput`). Mouse movement is left alone, so hover text keeps working, and nothing outside the window is affected.
+
 ## Development
 
 ```bash
 ./gradlew run     # starts RuneLite in developer mode with the plugin loaded
-./gradlew test    # unit tests for price parsing, GE tax and chart maths
+./gradlew test    # unit tests for price data, caching, GE tax and chart maths
+```
+
+On macOS with Java 17 or newer, RuneLite needs one extra JVM option to start:
+
+```bash
+JAVA_TOOL_OPTIONS="--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED" ./gradlew run
+```
+
+The icons are generated pixel art. To change them, edit [`tools/make_icons.py`](tools/make_icons.py) and run:
+
+```bash
+python3 tools/make_icons.py
 ```
 
 | Package | Contents |
 | --- | --- |
 | `price` | Wiki API client, cache/refresh policy, GE tax |
-| `chart` | Pure chart maths: viewport (zoom/pan), axis ticks, formatting |
+| `chart` | Pure chart maths: viewport (zoom/pan), scale, axis ticks, label layout, formatting |
 | `ge` | Adds the Market Lens button to the GE offer setup screen |
 | `ui` | Normal and expanded windows, chart renderer and overlays, mouse input, shared chart state |

@@ -1,11 +1,19 @@
 """Generates the Market Lens icons in an OSRS-like pixel style.
 
-Usage: python3 tools/make_icons.py src/main/resources/com/marketlens/ui [preview-dir]
-Writes chart_icon.png (GE button), chart_icon_small.png (title bar) and expand_icon.png. Previews are scaled 8x.
+Usage: python3 tools/make_icons.py [preview-dir]
+Writes chart_icon.png (GE button), chart_icon_small.png (title bar) and expand_icon.png to the plugin
+resources, and icon.png (the Plugin Hub icon: the chart icon at 2x) to the repository root.
+With a preview directory, also writes every icon scaled 8x there.
 """
 import struct
 import sys
 import zlib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+RESOURCES = ROOT / 'src/main/resources/com/marketlens/ui'
+# The Plugin Hub shows icon.png from the repository root, at most 48x72.
+HUB_ICON_SCALE = 2
 
 # Muted, shaded colours as used in OSRS icons: highlight on top, base below, dark outline.
 GREEN = {'light': (0x8C, 0xD8, 0x4A), 'base': (0x3A, 0x9A, 0x22)}
@@ -89,9 +97,10 @@ def write_png(path, pixels, scale=1):
 
 
 def save(name, pixels):
-    write_png(f'{sys.argv[1]}/{name}.png', pixels)
-    if len(sys.argv) > 2:
-        write_png(f'{sys.argv[2]}/{name}.png', pixels, 8)
+    write_png(RESOURCES / f'{name}.png', pixels)
+    if len(sys.argv) > 1:
+        write_png(Path(sys.argv[1]) / f'{name}.png', pixels, 8)
+    return pixels
 
 
 def expand_icon(size=13, arm=4):
@@ -112,6 +121,8 @@ for name, (width, height, shape, red_offset, pen) in VARIANTS.items():
     pixels = [[None] * width for _ in range(height)]
     paint(pixels, line_mask([(x, y + red_offset) for x, y in shape], width, height, pen), RED, pen > 1)
     paint(pixels, line_mask(shape, width, height, pen), GREEN, pen > 1)
-    save(name, add_outline(pixels))
+    pixels = save(name, add_outline(pixels))
+    if name == 'chart_icon':
+        write_png(ROOT / 'icon.png', pixels, HUB_ICON_SCALE)
 
 save('expand_icon', expand_icon())
