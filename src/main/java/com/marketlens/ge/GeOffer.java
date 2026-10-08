@@ -13,8 +13,8 @@ import net.runelite.client.game.ItemManager;
 public class GeOffer
 {
 	/**
-	 * Price per item of the offer being set up. Not named in RuneLite's gameval constants yet; identified by
-	 * watching it follow the GE's -5%/+5% buttons (137 -> 143 -> 150 -> 143).
+	 * Price per item of the offer being set up; a 64-bit ("long") varp. Not named in RuneLite's gameval constants
+	 * yet; identified by watching it follow the GE's -5%/+5% buttons (137 -> 143 -> 150 -> 143).
 	 */
 	private static final int PRICE_VARP = 5753;
 
@@ -41,7 +41,7 @@ public class GeOffer
 		{
 			return null;
 		}
-		int price = client.getVarpValue(PRICE_VARP);
-		return price > 0 ? (long) price : null;
+		long price = client.getVarpLongValue(PRICE_VARP);
+		return price > 0 ? price : null;
 	}
 }
