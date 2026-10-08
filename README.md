@@ -1,24 +1,70 @@
 # <img src="icon.png" alt="" width="40"> Market Lens
 
-A RuneLite plugin that adds real-time Grand Exchange price charts to the GE offer screen.
+Real-time Grand Exchange price charts, right inside the GE offer screen.
 
-When you set up a buy or sell offer, a **Market Lens** button (the price-chart icon) appears right of the Confirm button. Click it to open the Market Lens window on top of the GE:
+![Market Lens next to a Coal offer: live buy and sell prices, margin, tax and a 24-hour price chart](screenshots/normal-view.jpg)
 
-- Instant buy and sell prices, with the time of the last trade
+## How it works
+
+1. **Set up a buy or sell offer.** A small magnifier button appears to the right of Confirm.
+
+   <img src="screenshots/button-ge-interface-zoomed.png" alt="The Market Lens button" width="97">
+
+2. **Click it** to see the item's live prices next to a price chart, in a window that looks like the rest of the GE.
+3. **Expand the chart** to see it over most of the game screen.
+
+![The expanded chart](screenshots/expanded-view.jpg)
+
+## Features
+
+**Prices**
+
+- Instant buy and sell price, with the time of the last trade
 - Margin, GE tax (2%, capped at 5M, exempt items handled) and profit per item
 - Buy limit and 1-hour trade volume
-- A price chart with high/low lines, volume bars, a crosshair and live price tags
-- The price you chose on the GE offer screen, as a line on the chart in the GE's own price colour, so you can see where your offer sits
-- Dense data is merged into larger intervals (15m, 1h, ...) using volume-weighted averages, so the lines stay readable without losing accuracy; zoom in for every single bucket
+
+**Chart**
+
+- Line or candlestick chart, with volume bars
 - Timeframes: 1H, 6H, 24H, 1W, 1M, 6M, 1Y
-- Line or candlestick chart, switched with the buttons next to the timeframes and remembered in the plugin settings
-- An expand button that opens the chart over most of the game screen
+- Live price tags, and the price you entered on the GE offer screen as a line, so you can see where your offer sits
+- A crosshair that shows the time and price under the mouse, snapped to whole coins
+- Dense data is merged into larger intervals using volume-weighted averages, so the chart stays readable without losing accuracy. Zoom in to see every 5-minute bucket.
 
-Chart controls: scroll to zoom (hold Shift or Ctrl to zoom around the cursor), drag to pan, double-click to reset. Press Esc or the back arrow to close the window; in the expanded chart, Esc or the close button returns to the normal view.
+![Candlestick chart over six months](screenshots/candlesticks.jpg)
 
-Price data comes from the [OSRS Wiki real-time prices API](https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices).
+**Controls**
 
-## Development
+| Action | Control |
+| --- | --- |
+| Zoom (keeps the newest data in view) | Scroll |
+| Zoom around the mouse | Shift or Ctrl + scroll |
+| Move through time | Drag |
+| Reset the view | Double-click |
+| Close the expanded chart, then Market Lens | Esc |
+
+## Settings
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Default timeframe | 24H | Timeframe the chart opens with |
+| Remember last timeframe | Off | Open with the timeframe you used last instead |
+| Chart type | Line | Line or candles; also changed and remembered with the buttons above the chart |
+| Buy colour / Sell colour | Green / red | Colours of the prices, lines, candles, volume and tags |
+| Show volume bars | On | Traded volume below the price chart |
+| Show offer price line | On | The price entered on the GE offer screen, as a line on the chart |
+| Cross cursor on chart | On | A cross cursor while the mouse is over the chart |
+| Snap crosshair to whole coins | On | The crosshair's price jumps from one whole coin to the next |
+| Time format | Automatic | 12- or 24-hour clock; Automatic follows your computer's language and region |
+
+## Price data
+
+Prices come from the [OSRS Wiki real-time prices API](https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices).
+Market Lens only asks for data while its window is open, or when you point at its button, and only for that one item.
+Data is cached and never fetched more often than the wiki updates it. Requests only name the item; nothing about you or your account is sent.
+
+<details>
+<summary><b>Development</b></summary>
 
 ```bash
 ./gradlew run     # starts RuneLite in developer mode with the plugin loaded
@@ -47,3 +93,5 @@ Other icon designs that were considered (candlesticks, price tags, an eye, ...) 
 | `chart` | Pure chart maths: viewport (zoom/pan), scale, axis ticks, label layout, formatting |
 | `ge` | Adds the Market Lens button to the GE offer setup screen |
 | `ui` | Normal and expanded windows, chart renderer and overlays, mouse input, shared chart state |
+
+</details>
