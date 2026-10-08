@@ -142,12 +142,6 @@ public final class ChartScale
 		return volume == null ? 0 : (int) (volume * volumePane.height / maxVolume);
 	}
 
-	/** The visible point closest to {@code time}. */
-	public TimeseriesPoint nearest(double time)
-	{
-		return points.get(nearestIndex(time));
-	}
-
 	/** Index of the visible point closest to {@code time}. */
 	public int nearestIndex(double time)
 	{

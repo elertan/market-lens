@@ -64,7 +64,7 @@ public class ChartScaleTest
 	public void nearestPicksTheClosestVisiblePoint()
 	{
 		ChartScale scale = new ChartScale(series(10), 0, 900, 100, PLOT, true);
-		assertEquals(300, scale.nearest(340).getTimestamp());
-		assertEquals(400, scale.nearest(360).getTimestamp());
+		assertEquals(3, scale.nearestIndex(340));
+		assertEquals(4, scale.nearestIndex(360));
 	}
 }
