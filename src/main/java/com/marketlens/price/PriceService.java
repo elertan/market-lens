@@ -15,25 +15,32 @@ import lombok.Value;
 
 /**
  * Caches wiki price data and decides when to fetch it. Data is only fetched for the item the user is looking at
- * (or about to look at), and never more often than it can change:
+ * (or about to look at), and no more often than the prices.runescape.wiki website. Nothing is refreshed while the
+ * window stays open; only opening the window, switching the timeframe or hovering the Market Lens button fetches
+ * data, and only data that can have changed:
  * <ul>
- * <li>live price: per item, at most once a minute (the API caches it for 60s); failed fetches retry after 5s</li>
- * <li>price series: per item and lookback, at most once per bucket of that series; failed fetches retry after 5s</li>
+ * <li>live price: per item, if older than a minute (the API caches it for 60s)</li>
+ * <li>price series: per item and lookback, if a new bucket can have arrived since the last fetch</li>
  * <li>item names and buy limits: once per session, with growing delays between failed attempts</li>
  * </ul>
+ * Like the website, a failed live price or series is retried up to 3 times, but with longer delays (5s, 10s, 20s
+ * instead of 1s, 2s, 4s) to give a struggling API time to recover. After that, it waits for the user to open the
+ * window or pick a timeframe again.
  * Safe to use from any thread; {@link #onUpdate} fires on the OkHttp thread whenever new data arrives.
  */
 @Singleton
 public class PriceService
 {
 	private static final long LATEST_TTL_MS = TimeUnit.SECONDS.toMillis(60);
-	private static final long LATEST_RETRY_MS = TimeUnit.SECONDS.toMillis(5);
-	private static final long SERIES_RETRY_MS = TimeUnit.SECONDS.toMillis(5);
+	/** Delay before the first retry; it doubles for each retry after that. */
+	private static final long RETRY_MS = TimeUnit.SECONDS.toMillis(5);
+	private static final int MAX_RETRIES = 3;
 	private static final long MAPPING_RETRY_MIN_MS = TimeUnit.SECONDS.toMillis(5);
 	private static final long MAPPING_RETRY_MAX_MS = TimeUnit.MINUTES.toMillis(5);
 	private static final int MAX_CACHED_SERIES = 32;
-	/** "Volume (1h)" is summed from this series: it has 5-minute buckets. */
+	/** "Volume (1h)" needs 5-minute buckets: from this series, unless the chart's own series has them. */
 	private static final Timeframe VOLUME_SERIES = Timeframe.SIX_HOURS;
+	private static final Series MISSING = new Series(Status.LOADING, Collections.emptyList(), 0, 0, 0);
 
 	public enum Status
 	{
@@ -47,7 +54,17 @@ public class PriceService
 	{
 		Status status;
 		List<TimeseriesPoint> points;
+		/** When the last fetch started or ended; times the retries and the refetch. */
 		long fetchedAt;
+		/** Failed fetches in a row. */
+		int failures;
+		/** When {@link #points} arrived. Unlike {@link #fetchedAt}, kept while a refetch runs or after it fails. */
+		long pointsFetchedAt;
+
+		public boolean isRetrying()
+		{
+			return status == Status.FAILED && failures <= MAX_RETRIES;
+		}
 	}
 
 	private final WikiPriceClient client;
@@ -55,6 +72,7 @@ public class PriceService
 
 	private final Map<Integer, LatestPrice> latest = new ConcurrentHashMap<>();
 	private final Map<Integer, Long> latestFetchedAt = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> latestFailures = new ConcurrentHashMap<>();
 
 	private volatile Map<Integer, ItemMapping> mapping = Collections.emptyMap();
 	private final AtomicBoolean mappingInFlight = new AtomicBoolean();
@@ -87,15 +105,27 @@ public class PriceService
 
 	/**
 	 * Fetches whatever a Market Lens window for {@code itemId} needs and is stale: item names and buy limits,
-	 * the live price, the series behind "Volume (1h)" and the {@code timeframe} series.
-	 * Cheap to call often; called while the window is open and when the user hovers the Market Lens button.
+	 * the live price, the {@code timeframe} series and the series behind "Volume (1h)".
+	 * Called when the window opens, when the timeframe changes and when the user hovers the Market Lens button.
 	 */
 	public void refresh(int itemId, Timeframe timeframe)
 	{
 		refreshMapping();
-		refreshLatest(itemId);
-		getSeries(itemId, VOLUME_SERIES);
-		getSeries(itemId, timeframe);
+		refreshLatest(itemId, true);
+		refreshSeries(itemId, timeframe, true);
+		refreshSeries(itemId, volumeSeries(timeframe), true);
+	}
+
+	/**
+	 * Retries failed fetches for an open window; never refreshes data that loaded.
+	 * Cheap to call often; called every game tick while the window is open.
+	 */
+	public void retryFailed(int itemId, Timeframe timeframe)
+	{
+		refreshMapping();
+		refreshLatest(itemId, false);
+		refreshSeries(itemId, timeframe, false);
+		refreshSeries(itemId, volumeSeries(timeframe), false);
 	}
 
 	public LatestPrice getLatest(int itemId)
@@ -108,20 +138,20 @@ public class PriceService
 		return mapping.get(itemId);
 	}
 
-	/** Units traded (instant buys and sells) in the last hour, or null until its series has loaded. */
-	public Long getHourVolume(int itemId)
+	/**
+	 * Units traded (instant buys and sells) in the hour before the series was fetched, or null until it has loaded.
+	 * {@code timeframe} is the chart's, whose series is used if it has 5-minute buckets.
+	 */
+	public Long getHourVolume(int itemId, Timeframe timeframe)
 	{
-		Series volumeSeries;
-		synchronized (this)
-		{
-			volumeSeries = series.get(key(itemId, VOLUME_SERIES));
-		}
-		if (volumeSeries == null || volumeSeries.points.isEmpty())
+		Series volumeSeries = getSeries(itemId, volumeSeries(timeframe));
+		if (volumeSeries.points.isEmpty())
 		{
 			return null;
 		}
 
-		long since = TimeUnit.MILLISECONDS.toSeconds(clock.getAsLong()) - TimeUnit.HOURS.toSeconds(1);
+		// From the fetch time, not now: the series is not refreshed while the window is open.
+		long since = TimeUnit.MILLISECONDS.toSeconds(volumeSeries.pointsFetchedAt) - TimeUnit.HOURS.toSeconds(1);
 		long total = 0;
 		for (TimeseriesPoint point : volumeSeries.points)
 		{
@@ -133,30 +163,44 @@ public class PriceService
 		return total;
 	}
 
-	/** Returns the cached series and starts a fetch when it is missing or stale. */
+	/** Returns the cached series, or an empty loading one. Never fetches: see {@link #refresh}. */
 	public synchronized Series getSeries(int itemId, Timeframe timeframe)
+	{
+		return series.getOrDefault(key(itemId, timeframe), MISSING);
+	}
+
+	/** Starts a fetch of the series if it is missing or {@link #isDue due}; a new bucket can arrive once per bucket. */
+	private synchronized void refreshSeries(int itemId, Timeframe timeframe, boolean userAction)
 	{
 		String key = key(itemId, timeframe);
 		Series cached = series.get(key);
 		long now = clock.getAsLong();
-
-		boolean stale = cached == null
-			|| (cached.status == Status.READY && now - cached.fetchedAt > TimeUnit.SECONDS.toMillis(timeframe.getBucketSeconds()))
-			|| (cached.status == Status.FAILED && now - cached.fetchedAt > SERIES_RETRY_MS);
-		if (!stale)
+		long maxAge = TimeUnit.SECONDS.toMillis(timeframe.getBucketSeconds());
+		if (cached != null && (cached.status == Status.LOADING
+			|| !isDue(now - cached.fetchedAt, cached.failures, maxAge, userAction)))
 		{
-			return cached;
+			return;
 		}
 
-		// Keep showing old points while the refresh runs.
+		// Keep showing old points while the refresh runs. A user action starts a new round of retries.
 		List<TimeseriesPoint> previous = cached == null ? Collections.emptyList() : cached.points;
-		Series loading = new Series(Status.LOADING, previous, now);
-		series.put(key, loading);
+		long previousAt = cached == null ? 0 : cached.pointsFetchedAt;
+		int failures = cached == null || userAction ? 0 : cached.failures;
+		series.put(key, new Series(Status.LOADING, previous, now, failures, previousAt));
 
 		client.fetchTimeseries(itemId, timeframe,
-			points -> complete(key, new Series(Status.READY, points, clock.getAsLong())),
-			() -> complete(key, new Series(Status.FAILED, previous, clock.getAsLong())));
-		return loading;
+			points ->
+			{
+				long at = clock.getAsLong();
+				complete(key, new Series(Status.READY, points, at, 0, at));
+			},
+			() -> complete(key, new Series(Status.FAILED, previous, clock.getAsLong(), failures + 1, previousAt)));
+	}
+
+	/** The series "Volume (1h)" is summed from: the chart's own if it has 5-minute buckets, so no extra fetch. */
+	private static Timeframe volumeSeries(Timeframe timeframe)
+	{
+		return timeframe.getBucketSeconds() == VOLUME_SERIES.getBucketSeconds() ? timeframe : VOLUME_SERIES;
 	}
 
 	/** Drops all cached data, e.g. when the plugin stops. */
@@ -165,6 +209,7 @@ public class PriceService
 		series.clear();
 		latest.clear();
 		latestFetchedAt.clear();
+		latestFailures.clear();
 		mapping = Collections.emptyMap();
 		mappingRetryAt = 0;
 		mappingRetryDelay = MAPPING_RETRY_MIN_MS;
@@ -192,27 +237,70 @@ public class PriceService
 			});
 	}
 
-	private void refreshLatest(int itemId)
+	/** Starts a fetch of the live price if it is missing or {@link #isDue due}; the API caches it for 60s. */
+	private void refreshLatest(int itemId, boolean userAction)
 	{
 		long now = clock.getAsLong();
 		Long fetchedAt = latestFetchedAt.get(itemId);
-		if (fetchedAt != null && now - fetchedAt < LATEST_TTL_MS)
+		if (fetchedAt != null
+			&& !isDue(now - fetchedAt, latestFailures.getOrDefault(itemId, 0), LATEST_TTL_MS, userAction))
 		{
 			return;
 		}
-		// Recorded up front: also stops duplicate requests while this one runs, and delays a retry after failure.
+
+		// Recorded up front: also stops duplicate requests while this one runs. A user action starts a new round
+		// of retries.
 		latestFetchedAt.put(itemId, now);
+		if (userAction)
+		{
+			latestFailures.remove(itemId);
+		}
 		client.fetchLatest(itemId,
 			price ->
 			{
+				latestFailures.remove(itemId);
 				if (price != null)
 				{
 					latest.put(itemId, price);
 				}
 				onUpdate.run();
 			},
-			// Backdate the attempt so the next one comes after the short retry delay, not a full minute.
-			() -> latestFetchedAt.put(itemId, clock.getAsLong() - LATEST_TTL_MS + LATEST_RETRY_MS));
+			() ->
+			{
+				// Retry delays count from the failure, not from the start of the request.
+				latestFetchedAt.put(itemId, clock.getAsLong());
+				latestFailures.merge(itemId, 1, Integer::sum);
+			});
+	}
+
+	/**
+	 * Whether cached data should be fetched again.
+	 *
+	 * @param age        time since the last fetch started or failed
+	 * @param failures   failed fetches in a row; 0 if the data loaded
+	 * @param maxAge     how old loaded data can get before it may have changed
+	 * @param userAction whether the user opened the window, switched the timeframe or hovered the button
+	 */
+	private static boolean isDue(long age, int failures, long maxAge, boolean userAction)
+	{
+		if (failures == 0)
+		{
+			// Loaded: only a user action refreshes it, and only once it may have changed.
+			return userAction && age >= maxAge;
+		}
+		if (userAction)
+		{
+			// Failed: the user can always try again, after a short pause.
+			return age >= RETRY_MS;
+		}
+		// Failed: a few automatic retries, further apart each time.
+		return failures <= MAX_RETRIES && age >= retryDelay(failures);
+	}
+
+	/** 5s, 10s, 20s after the 1st, 2nd and 3rd failure in a row. */
+	private static long retryDelay(int failures)
+	{
+		return RETRY_MS << (failures - 1);
 	}
 
 	private void complete(String key, Series result)

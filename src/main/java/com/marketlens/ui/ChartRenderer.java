@@ -113,8 +113,8 @@ public class ChartRenderer
 
 			if (series.getPoints().isEmpty())
 			{
-				text.drawCentered(statusText(series.getStatus()), area.x + area.width / 2, area.y + area.height / 2,
-					Palette.TEXT_ORANGE);
+				text.drawCentered(statusText(series.getStatus(), series.isRetrying()), area.x + area.width / 2,
+					area.y + area.height / 2, Palette.TEXT_ORANGE);
 				return;
 			}
 
@@ -127,7 +127,7 @@ public class ChartRenderer
 			List<TimeseriesPoint> points = candleMode ? candlePoints : pointsAt(series.getPoints(), interval);
 			if (points.isEmpty())
 			{
-				text.drawCentered(statusText(PriceService.Status.READY), area.x + area.width / 2,
+				text.drawCentered(statusText(PriceService.Status.READY, false), area.x + area.width / 2,
 					area.y + area.height / 2, Palette.TEXT_ORANGE);
 				return;
 			}
@@ -175,14 +175,14 @@ public class ChartRenderer
 		return candles;
 	}
 
-	private static String statusText(PriceService.Status status)
+	private static String statusText(PriceService.Status status, boolean retrying)
 	{
 		switch (status)
 		{
 			case LOADING:
 				return "Loading prices...";
 			case FAILED:
-				return "Price data unavailable, retrying...";
+				return retrying ? "Price data unavailable, retrying..." : "Price data unavailable";
 			default:
 				return "No trades in this period";
 		}

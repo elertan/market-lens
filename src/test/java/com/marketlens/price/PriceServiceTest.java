@@ -1,6 +1,7 @@
 package com.marketlens.price;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import com.google.gson.Gson;
 import java.util.ArrayList;
@@ -32,6 +33,15 @@ public class PriceServiceTest
 	}
 
 	@Test
+	public void livePriceIsNotRefreshedWhileTheWindowStaysOpen()
+	{
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		now += TimeUnit.MINUTES.toMillis(5);
+		service.retryFailed(ITEM, Timeframe.ONE_DAY);
+		assertEquals(1, client.count("latest"));
+	}
+
+	@Test
 	public void livePriceIsFetchedAtMostOncePerMinute()
 	{
 		service.refresh(ITEM, Timeframe.ONE_DAY);
@@ -44,45 +54,88 @@ public class PriceServiceTest
 	}
 
 	@Test
-	public void failedLivePriceRetriesAfterFiveSeconds()
+	public void failedLivePriceRetriesThreeTimesWithGrowingDelays()
 	{
 		service.refresh(ITEM, Timeframe.ONE_DAY);
-		client.failLatest();
-		now += TimeUnit.SECONDS.toMillis(4);
-		service.refresh(ITEM, Timeframe.ONE_DAY);
-		assertEquals(1, client.count("latest"));
+		long[] delays = {5, 10, 20};
+		for (int i = 0; i < delays.length; i++)
+		{
+			client.failLatest();
+			now += TimeUnit.SECONDS.toMillis(delays[i] - 1);
+			service.retryFailed(ITEM, Timeframe.ONE_DAY);
+			assertEquals("not before the delay", i + 1, client.count("latest"));
+			now += TimeUnit.SECONDS.toMillis(2);
+			service.retryFailed(ITEM, Timeframe.ONE_DAY);
+			assertEquals(i + 2, client.count("latest"));
+		}
 
-		now += TimeUnit.SECONDS.toMillis(2);
+		client.failLatest();
+		now += TimeUnit.HOURS.toMillis(1);
+		service.retryFailed(ITEM, Timeframe.ONE_DAY);
+		assertEquals("no more retries while open", 4, client.count("latest"));
+
 		service.refresh(ITEM, Timeframe.ONE_DAY);
-		assertEquals(2, client.count("latest"));
+		assertEquals("a user action tries again", 5, client.count("latest"));
 	}
 
 	@Test
-	public void seriesIsRefreshedOncePerBucket()
+	public void seriesIsRefetchedOnUserActionOncePerBucket()
 	{
-		service.getSeries(ITEM, Timeframe.ONE_YEAR);
+		service.refresh(ITEM, Timeframe.ONE_YEAR);
 		client.succeedSeries();
 		now += TimeUnit.HOURS.toMillis(12);
-		service.getSeries(ITEM, Timeframe.ONE_YEAR);
+		service.refresh(ITEM, Timeframe.ONE_YEAR);
 		assertEquals("daily buckets: no refetch within a day", 1, client.count("timeseries:1y"));
 
 		now += TimeUnit.HOURS.toMillis(13);
-		service.getSeries(ITEM, Timeframe.ONE_YEAR);
+		service.refresh(ITEM, Timeframe.ONE_YEAR);
 		assertEquals(2, client.count("timeseries:1y"));
 	}
 
 	@Test
-	public void failedSeriesRetriesAfterFiveSeconds()
+	public void seriesIsNotRefetchedWhileTheWindowStaysOpen()
 	{
-		service.getSeries(ITEM, Timeframe.ONE_DAY);
-		client.failSeries();
-		now += TimeUnit.SECONDS.toMillis(4);
-		service.getSeries(ITEM, Timeframe.ONE_DAY);
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		client.succeedSeries();
+		now += TimeUnit.HOURS.toMillis(1);
+		service.retryFailed(ITEM, Timeframe.ONE_DAY);
 		assertEquals(1, client.count("timeseries:24h"));
+	}
 
-		now += TimeUnit.SECONDS.toMillis(2);
-		service.getSeries(ITEM, Timeframe.ONE_DAY);
-		assertEquals(2, client.count("timeseries:24h"));
+	@Test
+	public void failedSeriesRetriesThreeTimesWithGrowingDelays()
+	{
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		long[] delays = {5, 10, 20};
+		for (int i = 0; i < delays.length; i++)
+		{
+			client.failSeries();
+			now += TimeUnit.SECONDS.toMillis(delays[i] - 1);
+			service.retryFailed(ITEM, Timeframe.ONE_DAY);
+			assertEquals("not before the delay", i + 1, client.count("timeseries:24h"));
+			now += TimeUnit.SECONDS.toMillis(2);
+			service.retryFailed(ITEM, Timeframe.ONE_DAY);
+			assertEquals(i + 2, client.count("timeseries:24h"));
+		}
+
+		client.failSeries();
+		now += TimeUnit.HOURS.toMillis(1);
+		service.retryFailed(ITEM, Timeframe.ONE_DAY);
+		assertEquals("no more retries while open", 4, client.count("timeseries:24h"));
+		assertFalse(service.getSeries(ITEM, Timeframe.ONE_DAY).isRetrying());
+
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		assertEquals("a user action tries again", 5, client.count("timeseries:24h"));
+	}
+
+	@Test
+	public void volumeUsesTheChartSeriesWhenItHasFiveMinuteBuckets()
+	{
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		assertEquals(0, client.count("timeseries:6h"));
+
+		service.refresh(ITEM, Timeframe.ONE_WEEK);
+		assertEquals(1, client.count("timeseries:6h"));
 	}
 
 	@Test
@@ -112,16 +165,24 @@ public class PriceServiceTest
 	@Test
 	public void hourVolumeSumsTheLastHourOfFiveMinuteBuckets()
 	{
-		assertNull(service.getHourVolume(ITEM));
+		assertNull(service.getHourVolume(ITEM, Timeframe.ONE_DAY));
 
 		service.refresh(ITEM, Timeframe.ONE_DAY);
 		long nowSeconds = TimeUnit.MILLISECONDS.toSeconds(now);
-		client.succeed("timeseries:6h", Arrays.asList(
+		client.succeed("timeseries:24h", Arrays.asList(
 			point(nowSeconds - 7_200, 100, 100),  // two hours ago: not counted
 			point(nowSeconds - 3_000, 5, 7),
 			point(nowSeconds - 300, 1, null)));
 
-		assertEquals(Long.valueOf(13), service.getHourVolume(ITEM));
+		assertEquals(Long.valueOf(13), service.getHourVolume(ITEM, Timeframe.ONE_DAY));
+		now += TimeUnit.HOURS.toMillis(2);
+		assertEquals("counted from the fetch, not from now", Long.valueOf(13), service.getHourVolume(ITEM, Timeframe.ONE_DAY));
+
+		// A refetch that fails keeps the old points, so it must keep counting from their fetch.
+		service.refresh(ITEM, Timeframe.ONE_DAY);
+		assertEquals("while refetching", Long.valueOf(13), service.getHourVolume(ITEM, Timeframe.ONE_DAY));
+		client.failSeries();
+		assertEquals("after a failed refetch", Long.valueOf(13), service.getHourVolume(ITEM, Timeframe.ONE_DAY));
 	}
 
 	private static TimeseriesPoint point(long timestamp, Integer highVolume, Integer lowVolume)
@@ -196,6 +257,7 @@ public class PriceServiceTest
 		void failSeries()
 		{
 			seriesFailures.forEach(Runnable::run);
+			seriesFailures.clear();
 		}
 	}
 }

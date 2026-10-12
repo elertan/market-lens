@@ -116,12 +116,12 @@ public class PriceWindow extends GeWindow implements KeyListener
 		}
 	}
 
-	/** Every game tick while open: keeps the prices current and the "Traded ... ago" texts ticking. */
+	/** Every game tick while open: retries failed fetches and keeps the "Traded ... ago" texts ticking. */
 	public void onGameTick()
 	{
 		if (state.isOpen())
 		{
-			prices.refresh(state.getItemId(), state.getTimeframe());
+			prices.retryFailed(state.getItemId(), state.getTimeframe());
 			refreshTradeAges();
 		}
 	}
@@ -185,7 +185,7 @@ public class PriceWindow extends GeWindow implements KeyListener
 
 		Integer limit = mapping == null ? null : mapping.getLimit();
 		limitValue.setText(limit == null ? "-" : PriceFormat.exact(limit));
-		Long hourVolume = prices.getHourVolume(itemId);
+		Long hourVolume = prices.getHourVolume(itemId, state.getTimeframe());
 		volumeValue.setText(hourVolume == null ? "-" : PriceFormat.exact(hourVolume));
 	}
 
